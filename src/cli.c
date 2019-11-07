@@ -4,15 +4,6 @@
 #include "sapi.h"
 #include "terminal.h"
 
-typedef void (*cmd_handler_t)();
-
-typedef struct cmd {
-    char *cmd;
-    cmd_handler_t handler;
-    char *description;
-    struct cmd *next;
-} cmd_t;
-
 static cmd_t *commands = NULL;
 
 static void print_help() {
@@ -25,14 +16,14 @@ static void print_help() {
     }
 }
 
-static void cmd_help() {
+static void help_cmd_handler() {
     print_help();
 }
 
 static cmd_t help_command = {
     .cmd = "help",
-    .handler = cmd_help,
     .description = "List available commands",
+    .handler = help_cmd_handler,
     .next = NULL,
 };
 
@@ -73,8 +64,8 @@ static void cli_task(void *param) {
     }
 }
 
-bool cli_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority) {
-    if (!xTaskCreate(cli_task, "cliTask", stack_depth, 0, priority, 0)) {
+bool cli_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority, cmd_t *commands) {
+    if (!xTaskCreate(cli_task, "cliTask", stack_depth, commands, priority, 0)) {
         return 1;
     }
 
