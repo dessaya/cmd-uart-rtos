@@ -36,6 +36,12 @@ void terminal_puts(const char *s) {
     }
 }
 
+void terminal_println(const char *s) {
+    terminal_puts(s);
+    terminal_putc('\r');
+    terminal_putc('\n');
+}
+
 char terminal_getc() {
     char c;
     xQueueReceive(rxQueue, &c, portMAX_DELAY);
@@ -55,6 +61,19 @@ void terminal_gets(char *buf, size_t bufsize) {
         }
     }
     *s = '\0';
+}
+
+void terminal_readline(char *buf, size_t bufsize) {
+    if (bufsize == 0) {
+        return;
+    }
+    terminal_gets(buf, bufsize);
+    for (char *s = buf; *s; s++) {
+        if (*s == '\n' || *s == '\r') {
+            *s = '\0';
+            break;
+        }
+    }
 }
 
 bool terminal_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority) {
