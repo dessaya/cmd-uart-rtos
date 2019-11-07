@@ -1,7 +1,7 @@
 #include "gpio.h"
 #include "terminal.h"
 
-struct {
+static struct {
     configSTACK_DEPTH_TYPE stack_depth;
     UBaseType_t priority;
 } config = {0};

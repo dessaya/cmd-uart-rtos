@@ -59,7 +59,7 @@ static void cli_task(void *param) {
         } else {
             terminal_puts("Unknown command: '");
             terminal_puts(line);
-            terminal_println("'. Type 'help` to see a list of available commands.");
+            terminal_println("'. Type 'help' to see a list of available commands.");
         }
     }
 }
