@@ -6,37 +6,38 @@
 
 typedef void (*cmd_handler_t)();
 
-typedef struct {
+typedef struct cmd {
     char *cmd;
     cmd_handler_t handler;
-    char *help;
+    char *description;
+    struct cmd *next;
 } cmd_t;
 
-void cmd_gpio();
-void cmd_help();
+static cmd_t *commands = NULL;
 
-cmd_t commands[] = {
-    {"gpio", cmd_gpio, "Control GPIO ports"},
-    {"help", cmd_help, "Print help"},
-    {0},
-};
-
-void cmd_gpio() {
-    terminal_println(":)");
-}
-
-void cmd_help() {
-    terminal_println("Commands:");
-    for (cmd_t *cmd = commands; cmd->cmd; cmd++) {
+static void print_help() {
+    terminal_println("Available commands:");
+    for (const cmd_t *cmd = commands; cmd; cmd = cmd->next) {
         terminal_puts("  ");
         terminal_puts(cmd->cmd);
         terminal_puts(": ");
-        terminal_println(cmd->help);
+        terminal_println(cmd->description);
     }
 }
 
-cmd_t *cmd_find(char *line, cmd_t commands[]) {
-    for (cmd_t *cmd = commands; cmd->cmd; cmd++) {
+static void cmd_help() {
+    print_help();
+}
+
+static cmd_t help_command = {
+    .cmd = "help",
+    .handler = cmd_help,
+    .description = "List available commands",
+    .next = NULL,
+};
+
+static const cmd_t *find_command(const char *line) {
+    for (const cmd_t *cmd = commands; cmd; cmd = cmd->next) {
         if (strcmp(cmd->cmd, line) == 0) {
             return cmd;
         }
@@ -44,26 +45,31 @@ cmd_t *cmd_find(char *line, cmd_t commands[]) {
     return NULL;
 }
 
-void cmd_readline(cmd_t commands[]) {
-    terminal_puts("$ ");
-    char line[80];
-    terminal_readline(line, sizeof(line));
-    if (!*line) {
-        return;
-    }
-    cmd_t *cmd = cmd_find(line, commands);
-    if (cmd) {
-        cmd->handler();
-    } else {
-        terminal_puts("Unknown command: ");
-        terminal_println(line);
-        cmd_help();
-    }
-}
-
 static void cli_task(void *param) {
+    commands = &help_command;
+    help_command.next = (cmd_t *)param;
+
+    terminal_println("");
+    terminal_println("RTOS CLI initialized.");
+    print_help(commands);
+
     while (1) {
-        cmd_readline(commands);
+        terminal_puts("$ ");
+
+        char line[80];
+        terminal_readline(line, sizeof(line));
+        if (!*line) {
+            continue;
+        }
+
+        const cmd_t *cmd = find_command(line);
+        if (cmd) {
+            cmd->handler();
+        } else {
+            terminal_puts("Unknown command: '");
+            terminal_puts(line);
+            terminal_println("'. Type 'help` to see a list of available commands.");
+        }
     }
 }
 
