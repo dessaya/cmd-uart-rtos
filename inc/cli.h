@@ -4,7 +4,14 @@
 #include <stdbool.h>
 #include "FreeRTOS.h"
 
-typedef void (*cmd_handler_t)();
+#define CLI_ARGC_MAX 10
+
+typedef struct {
+    char *tokens[CLI_ARGC_MAX];
+    int count;
+} cmd_args_t;
+
+typedef void (*cmd_handler_t)(cmd_args_t *args);
 
 typedef struct cmd {
     char *cmd;

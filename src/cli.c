@@ -16,7 +16,7 @@ static void print_help() {
     }
 }
 
-static void help_cmd_handler() {
+static void help_cmd_handler(cmd_args_t *args) {
     print_help();
 }
 
@@ -36,6 +36,20 @@ static const cmd_t *find_command(const char *line) {
     return NULL;
 }
 
+cmd_args_t *parse(char *line) {
+    static cmd_args_t args;
+
+    args = (cmd_args_t){{0}, 0};
+    for (
+        char *token = strtok(line, " \t");
+        token && args.count < CLI_ARGC_MAX - 1;
+        token = strtok(NULL, " \t")
+    ) {
+        args.tokens[args.count++] = token;
+    }
+    return &args;
+}
+
 static void cli_task(void *param) {
     commands = &help_command;
     help_command.next = (cmd_t *)param;
@@ -47,15 +61,17 @@ static void cli_task(void *param) {
     while (1) {
         terminal_puts("$ ");
 
-        char line[80];
+        static char line[80];
         terminal_readline(line, sizeof(line));
-        if (!*line) {
+
+        cmd_args_t *args = parse(line);
+        if (args->count == 0) {
             continue;
         }
 
-        const cmd_t *cmd = find_command(line);
+        const cmd_t *cmd = find_command(args->tokens[0]);
         if (cmd) {
-            cmd->handler();
+            cmd->handler(args);
         } else {
             terminal_puts("Unknown command: '");
             terminal_puts(line);

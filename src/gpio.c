@@ -6,7 +6,7 @@ static struct {
     UBaseType_t priority;
 } config = {0};
 
-static void gpio_cmd_handler() {
+static void gpio_cmd_handler(cmd_args_t *args) {
     terminal_println(":)");
 }
 
