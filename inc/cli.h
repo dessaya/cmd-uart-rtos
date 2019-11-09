@@ -2,7 +2,6 @@
 #define CLI_H
 
 #include <stdbool.h>
-#include "FreeRTOS.h"
 
 #define CLI_ARGC_MAX 10
 
@@ -20,7 +19,7 @@ typedef struct cmd {
     struct cmd *next;
 } cmd_t;
 
-bool cli_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority, cmd_t *commands);
+bool cli_init(cmd_t *commands);
 
 #endif
 

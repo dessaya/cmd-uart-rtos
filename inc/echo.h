@@ -3,7 +3,7 @@
 
 #include "cli.h"
 
-cmd_t *echo_init();
+extern cmd_t echo_command;
 
 #endif
 

@@ -1,8 +1,10 @@
 #include <string.h>
 #include "cli.h"
-#include "task.h"
 #include "sapi.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include "terminal.h"
+#include "task_priorities.h"
 
 static cmd_t *commands = NULL;
 
@@ -80,8 +82,15 @@ static void cli_task(void *param) {
     }
 }
 
-bool cli_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority, cmd_t *commands) {
-    if (!xTaskCreate(cli_task, "cliTask", stack_depth, commands, priority, 0)) {
+bool cli_init(cmd_t *commands) {
+    if (!xTaskCreate(
+        cli_task,
+        "cliTask",
+        configMINIMAL_STACK_SIZE,
+        commands,
+        CLI_TASK_PRIORITY,
+        0
+    )) {
         return 1;
     }
 

@@ -1,7 +1,9 @@
 #include "terminal.h"
-#include "task.h"
 #include "sapi.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include "queue.h"
+#include "task_priorities.h"
 
 #define UART_PORT UART_USB
 
@@ -76,7 +78,7 @@ void terminal_readline(char *buf, size_t bufsize) {
     }
 }
 
-bool terminal_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority) {
+bool terminal_init() {
     rxQueue = xQueueCreate(RXQUEUE_CAPACITY, sizeof(char));
     if (rxQueue == NULL) {
         return false;
@@ -91,7 +93,14 @@ bool terminal_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority) {
     uartCallbackSet(UART_PORT, UART_RECEIVE, uart_rx_isr, NULL);
     uartInterrupt(UART_PORT, true);
 
-    if (!xTaskCreate(terminal_tx_task, "terminal_tx_task", stack_depth, 0, priority, 0)) {
+    if (!xTaskCreate(
+        terminal_tx_task,
+        "terminal_tx_task",
+        configMINIMAL_STACK_SIZE,
+        0,
+        TERMINAL_TASK_PRIORITY,
+        0
+    )) {
         return false;
     }
 

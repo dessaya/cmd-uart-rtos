@@ -3,7 +3,7 @@
 
 #include "cli.h"
 
-cmd_t *i2c_init(configSTACK_DEPTH_TYPE stack_depth, UBaseType_t priority);
+extern cmd_t i2c_command;
 
 #endif
 
