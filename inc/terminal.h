@@ -14,4 +14,6 @@ char terminal_getc();
 void terminal_gets(char *buf, size_t bufsize);
 void terminal_readline(char *buf, size_t bufsize);
 
+#define log_error(msg) terminal_println("Error: " msg)
+
 #endif

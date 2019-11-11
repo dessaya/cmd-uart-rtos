@@ -9,11 +9,11 @@
 
 static void print_help() {
     terminal_println("Available commands:");
-    for (const cmd_t *cmd = commands[0]; cmd; cmd++) {
+    for (const cmd_t **cmd = commands; *cmd; cmd++) {
         terminal_puts("  ");
-        terminal_puts(cmd->name);
+        terminal_puts((*cmd)->name);
         terminal_puts(": ");
-        terminal_println(cmd->description);
+        terminal_println((*cmd)->description);
     }
 }
 
@@ -28,9 +28,9 @@ const cmd_t help_command = {
 };
 
 static const cmd_t *find_command(const char *line) {
-    for (const cmd_t *cmd = commands[0]; cmd; cmd++) {
-        if (strcmp(cmd->name, line) == 0) {
-            return cmd;
+    for (const cmd_t **cmd = commands; *cmd; cmd++) {
+        if (strcmp((*cmd)->name, line) == 0) {
+            return *cmd;
         }
     }
     return NULL;
@@ -53,7 +53,7 @@ cmd_args_t *parse(char *line) {
 static void cli_task(void *param) {
     terminal_println("");
     terminal_println("RTOS CLI initialized.");
-    print_help(commands);
+    print_help();
 
     while (1) {
         terminal_puts("$ ");
@@ -78,15 +78,16 @@ static void cli_task(void *param) {
 }
 
 bool cli_init() {
-    if (!xTaskCreate(
+    if (xTaskCreate(
         cli_task,
         "cliTask",
         configMINIMAL_STACK_SIZE,
-        commands,
+        0,
         CLI_TASK_PRIORITY,
         0
-    )) {
-        return 1;
+    ) != pdPASS) {
+        log_error("Failed to create task");
+        return false;
     }
 
     return true;

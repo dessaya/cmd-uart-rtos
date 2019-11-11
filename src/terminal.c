@@ -93,14 +93,15 @@ bool terminal_init() {
     uartCallbackSet(UART_PORT, UART_RECEIVE, uart_rx_isr, NULL);
     uartInterrupt(UART_PORT, true);
 
-    if (!xTaskCreate(
+    if (xTaskCreate(
         terminal_tx_task,
         "terminal_tx_task",
         configMINIMAL_STACK_SIZE,
         0,
         TERMINAL_TASK_PRIORITY,
         0
-    )) {
+    ) != pdPASS) {
+        log_error("Failed to create task");
         return false;
     }
 

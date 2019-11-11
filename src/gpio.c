@@ -144,15 +144,15 @@ static void gpio_cmd_blink_handler(port_t *port, cmd_args_t *args) {
         static blink_task_param_t param;
         param.port = port;
         param.period = period;
-        if (!xTaskCreate(
+        if (xTaskCreate(
             blink_task,
             port->blink_task_name,
             configMINIMAL_STACK_SIZE,
             &param,
             GPIO_BLINK_TASK_PRIORITY,
             &port->blink_task
-        )) {
-            terminal_println("Failed to create task");
+        ) != pdPASS) {
+            log_error("Failed to create task");
         }
     }
 }
