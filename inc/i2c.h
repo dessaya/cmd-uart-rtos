@@ -3,7 +3,7 @@
 
 #include "cli.h"
 
-extern cmd_t i2c_command;
+extern const cmd_t i2c_command;
 
 #endif
 

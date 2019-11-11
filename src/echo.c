@@ -11,9 +11,8 @@ static void echo_cmd_handler(cmd_args_t *args) {
     terminal_putc('\n');
 }
 
-cmd_t echo_command = {
-    .cmd = "echo",
+const cmd_t echo_command = {
+    .name = "echo",
     .description = "Print some text",
     .handler = echo_cmd_handler,
-    .next = NULL,
 };

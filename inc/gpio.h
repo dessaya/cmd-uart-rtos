@@ -3,7 +3,7 @@
 
 #include "cli.h"
 
-extern cmd_t gpio_command;
+extern const cmd_t gpio_command;
 
 #endif
 

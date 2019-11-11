@@ -14,18 +14,25 @@ typedef struct {
     char *blink_task_name;
 } port_t;
 
-static port_t ports[] = {
-    {"TEC1", TEC1, 0, "TEC1 blink task"},
-    {"TEC2", TEC2, 0, "TEC2 blink task"},
-    {"TEC3", TEC3, 0, "TEC3 blink task"},
-    {"TEC4", TEC4, 0, "TEC4 blink task"},
+#define MAKE_PORT(gpio_port) { \
+    .name = #gpio_port, \
+    .pin = gpio_port, \
+    .blink_task = 0, \
+    .blink_task_name = #gpio_port " blink task" \
+}
 
-    {"LEDR", LEDR, 0, "LEDR blink task"},
-    {"LEDG", LEDG, 0, "LEDG blink task"},
-    {"LEDB", LEDB, 0, "LEDB blink task"},
-    {"LED1", LED1, 0, "LED1 blink task"},
-    {"LED2", LED2, 0, "LED2 blink task"},
-    {"LED3", LED3, 0, "LED3 blink task"},
+static port_t ports[] = {
+    MAKE_PORT(TEC1),
+    MAKE_PORT(TEC2),
+    MAKE_PORT(TEC3),
+    MAKE_PORT(TEC4),
+
+    MAKE_PORT(LEDR),
+    MAKE_PORT(LEDG),
+    MAKE_PORT(LEDB),
+    MAKE_PORT(LED1),
+    MAKE_PORT(LED2),
+    MAKE_PORT(LED3),
     {0},
 };
 
@@ -177,9 +184,8 @@ static void gpio_cmd_handler(cmd_args_t *args) {
     command(port, args);
 }
 
-cmd_t gpio_command = {
-    .cmd = "gpio",
+const cmd_t gpio_command = {
+    .name = "gpio",
     .description = "Control GPIO ports",
     .handler = gpio_cmd_handler,
-    .next = NULL,
 };

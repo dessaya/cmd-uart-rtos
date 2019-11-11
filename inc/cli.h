@@ -13,13 +13,14 @@ typedef struct {
 typedef void (*cmd_handler_t)(cmd_args_t *args);
 
 typedef struct cmd {
-    char *cmd;
+    char *name;
     char *description;
     cmd_handler_t handler;
-    struct cmd *next;
 } cmd_t;
 
-bool cli_init(cmd_t *commands);
+bool cli_init();
+
+extern const cmd_t help_command;
 
 #endif
 
