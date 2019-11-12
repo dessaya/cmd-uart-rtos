@@ -58,11 +58,21 @@ static void cli_task(void *param) {
     while (1) {
         terminal_puts("$ ");
 
-        static char line[80];
+        #define LINE_LENGTH 80
+
+        static char line[LINE_LENGTH];
         terminal_readline(line, sizeof(line));
+        if (strlen(line) >= LINE_LENGTH - 1) {
+            log_error("Line is too long.");
+            continue;
+        }
 
         cmd_args_t *args = parse(line);
         if (args->count == 0) {
+            continue;
+        }
+        if (args->count >= CLI_ARGC_MAX) {
+            log_error("Too many arguments.");
             continue;
         }
 
@@ -81,7 +91,7 @@ bool cli_init() {
     if (xTaskCreate(
         cli_task,
         "cliTask",
-        configMINIMAL_STACK_SIZE,
+        configMINIMAL_STACK_SIZE * 2,
         0,
         CLI_TASK_PRIORITY,
         0
