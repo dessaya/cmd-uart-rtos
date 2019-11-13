@@ -213,7 +213,7 @@ static gpio_cmd_handler_t find_gpio_cmd(const char *name) {
 /** `gpio` command handler function. */
 static void gpio_cmd_handler(cmd_args_t *args) {
     CMD_ASSERT_USAGE(args->count >= 2);
-    if (strcmp(args->tokens[1], "help")) {
+    if (!strcmp(args->tokens[1], "help")) {
         usage();
         return;
     }
