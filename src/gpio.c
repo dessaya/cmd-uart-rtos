@@ -133,7 +133,7 @@ typedef struct {
 } blink_task_param_t;
 
 /** RTOS task for controlling a blinking GPIO port. */
-static void blink_task(void *param) {
+static void gpio_blink_task(void *param) {
     port_t *port = ((blink_task_param_t *)param)->port;
     int period = ((blink_task_param_t *)param)->period;
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -158,7 +158,7 @@ static void gpio_cmd_blink_handler(port_t *port, cmd_args_t *args) {
         param.port = port;
         param.period = period;
         if (xTaskCreate(
-            blink_task,
+            gpio_blink_task,
             port->blink_task_name,
             configMINIMAL_STACK_SIZE,
             &param,
