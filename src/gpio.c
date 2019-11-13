@@ -7,6 +7,23 @@
 #include "task.h"
 #include "task_priorities.h"
 
+static void usage() {
+    terminal_puts(
+        "Usage: gpio <pin> <command> ...\r\n"
+        "Examples:\r\n"
+        "  gpio TEC1 read\r\n"
+        "  gpio LEDB write 1\r\n"
+        "  gpio LED1 blink 2000\r\n"
+    );
+}
+
+#define CMD_ASSERT_USAGE(cond) do { \
+    if (!(cond)) { \
+        usage(); \
+        return; \
+    } \
+} while (0)
+
 typedef struct {
     char *name;
     gpioMap_t pin;
@@ -78,33 +95,6 @@ static value_token_t *find_value(const char *name) {
     return NULL;
 }
 
-typedef enum {READ, WRITE, BLINK} gpio_cmd_t;
-
-typedef void (*gpio_cmd_handler_t)(port_t *port, cmd_args_t *args);
-
-typedef struct {
-    char **tokens;
-    gpio_cmd_handler_t handler;
-} gpio_cmd_token_t;
-
-static void usage() {
-    terminal_println("Usage: gpio <pin> <command> ...");
-    terminal_println("Examples:");
-    terminal_println("  gpio TEC1 read");
-    terminal_println("  gpio LEDB write 1");
-    terminal_println("  gpio LEDB blink 2000");
-}
-
-#define _CMD_ASSERT(cond, ...) do { \
-    if (!(cond)) { \
-        __VA_ARGS__; \
-        return; \
-    } \
-} while (0)
-
-#define CMD_ASSERT_USAGE(cond) _CMD_ASSERT(cond, usage())
-#define CMD_ASSERT(cond) _CMD_ASSERT(cond, )
-
 static void gpio_cmd_read_handler(port_t *port, cmd_args_t *args) {
     terminal_println(value_to_string(gpioRead(port->pin)));
 }
@@ -157,6 +147,13 @@ static void gpio_cmd_blink_handler(port_t *port, cmd_args_t *args) {
     }
 }
 
+typedef void (*gpio_cmd_handler_t)(port_t *port, cmd_args_t *args);
+
+typedef struct {
+    char **tokens;
+    gpio_cmd_handler_t handler;
+} gpio_cmd_token_t;
+
 static gpio_cmd_token_t gpio_cmd_handlers[] = {
     {(char *[]){"r", "read", 0}, gpio_cmd_read_handler},
     {(char *[]){"w", "write", 0}, gpio_cmd_write_handler},
@@ -176,6 +173,11 @@ static gpio_cmd_handler_t find_gpio_cmd(const char *name) {
 }
 
 static void gpio_cmd_handler(cmd_args_t *args) {
+    CMD_ASSERT_USAGE(args->count >= 2);
+    if (strcmp(args->tokens[1], "help")) {
+        usage();
+        return;
+    }
     CMD_ASSERT_USAGE(args->count >= 3);
     port_t *port = find_port(args->tokens[1]);
     CMD_ASSERT_USAGE(port);

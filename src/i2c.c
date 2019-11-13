@@ -5,35 +5,32 @@
 #include "terminal.h"
 #include "sapi.h"
 
-static unsigned int i2c_freq_hz = 0;
-
 static void usage() {
-    terminal_println("Usage: i2c <command> ...");
-    terminal_println("Examples:");
-    terminal_println("  i2c init <freq>");
-    terminal_println("      Eg: i2c init 400000");
-    terminal_println("  i2c write <address> <data...>");
-    terminal_println("      Eg: i2c write 50 00:00:de:ad:be:ef");
-    terminal_println("  i2c read <address> <writedata...> <nbytes>");
-    terminal_println("      Eg: i2c read 50 00:00 4");
+    terminal_puts(
+        "Usage: i2c <command> ...\r\n"
+        "Commands:\r\n"
+        "  help\r\n"
+        "  init <freq>\r\n"
+        "      Eg: i2c init 400000\r\n"
+        "  write <device_address> <tx_data...>\r\n"
+        "      Eg: i2c write 50 00:00:de:ad:be:ef\r\n"
+        "  read <device_address> <tx_data...> <rx_nbytes>\r\n"
+        "      Eg: i2c read 50 00:00 4\r\n"
+    );
 }
 
-#define _CMD_ASSERT(cond, ...) do { \
+static void i2c_cmd_help_handler(cmd_args_t *args) {
+    usage();
+}
+
+#define CMD_ASSERT_USAGE(cond) do { \
     if (!(cond)) { \
-        __VA_ARGS__; \
+        usage(); \
         return; \
     } \
 } while (0)
 
-#define CMD_ASSERT_USAGE(cond) _CMD_ASSERT(cond, usage())
-#define CMD_ASSERT(cond) _CMD_ASSERT(cond, )
-
-typedef void (*i2c_cmd_handler_t)(cmd_args_t *args);
-
-typedef struct {
-    char **tokens;
-    i2c_cmd_handler_t handler;
-} i2c_cmd_token_t;
+static unsigned int i2c_freq_hz = 0;
 
 static void i2c_cmd_init_handler(cmd_args_t *args) {
     CMD_ASSERT_USAGE(args->count >= 3);
@@ -149,7 +146,15 @@ static void i2c_cmd_read_handler(cmd_args_t *args) {
     print_data(rx_data, rx_nbytes);
 }
 
+typedef void (*i2c_cmd_handler_t)(cmd_args_t *args);
+
+typedef struct {
+    char **tokens;
+    i2c_cmd_handler_t handler;
+} i2c_cmd_token_t;
+
 static i2c_cmd_token_t i2c_cmd_handlers[] = {
+    {(char *[]){"help", 0}, i2c_cmd_help_handler},
     {(char *[]){"i", "init", 0}, i2c_cmd_init_handler},
     {(char *[]){"r", "read", 0}, i2c_cmd_read_handler},
     {(char *[]){"w", "write", 0}, i2c_cmd_write_handler},
