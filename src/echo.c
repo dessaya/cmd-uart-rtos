@@ -1,6 +1,7 @@
 #include "gpio.h"
 #include "terminal.h"
 
+/** `echo` command handler function. */
 static void echo_cmd_handler(cmd_args_t *args) {
     for (int i = 1; i < args->count; i++) {
         terminal_puts(args->tokens[i]);

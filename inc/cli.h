@@ -3,23 +3,40 @@
 
 #include <stdbool.h>
 
+/** Maximum amount of arguments for any given command. */
 #define CLI_ARGC_MAX 10
 
+/**
+ * A parsed command, analogous to `argv` & `argc`.
+ *
+ * Example: if the user enters the command `gpio LED1 write 1`, this
+ * struct will contain `tokens = {"gpio", "LED1", "write", "1"}`, and
+ * `count = 4`.
+ */
 typedef struct {
+    /** Command arguments (`tokens[0]` would be the command itself). */
     char *tokens[CLI_ARGC_MAX];
+    /** Amount of arguments (including the command itself). */
     int count;
 } cmd_args_t;
 
+/** Command handler function prototype. */
 typedef void (*cmd_handler_t)(cmd_args_t *args);
 
+/** Command definition. \see commands */
 typedef struct cmd {
+    /** Command name. */
     char *name;
+    /** Command description, used for displaying help. */
     char *description;
+    /** Command handler function. */
     cmd_handler_t handler;
 } cmd_t;
 
+/** Create the CLI task. */
 bool cli_init();
 
+/** `help` command definition. */
 extern const cmd_t help_command;
 
 #endif

@@ -10,15 +10,24 @@
 #define RXQUEUE_CAPACITY 128
 #define TXQUEUE_CAPACITY 128
 
+/** Input character buffer. */
 static QueueHandle_t rxQueue;
+/** Output character buffer. */
 static QueueHandle_t txQueue;
 
+/**
+ * ISR executed when a character is received on the UART, which is enqueued on rxQueue.
+ */
 static void uart_rx_isr(void *unused)
 {
    char c = uartRxRead(UART_PORT);
    xQueueSendToBackFromISR(rxQueue, &c, NULL);
 }
 
+/**
+ * RTOS task that waits until there is a character waiting in txQueue and writes
+ * it to the UART, in an infinite loop.
+ */
 static void terminal_tx_task(void *param) {
     while (1) {
         char c;
@@ -63,19 +72,6 @@ void terminal_gets(char *buf, size_t bufsize) {
         }
     }
     *s = '\0';
-}
-
-void terminal_readline(char *buf, size_t bufsize) {
-    if (bufsize == 0) {
-        return;
-    }
-    terminal_gets(buf, bufsize);
-    for (char *s = buf; *s; s++) {
-        if (*s == '\n' || *s == '\r') {
-            *s = '\0';
-            break;
-        }
-    }
 }
 
 bool terminal_init() {

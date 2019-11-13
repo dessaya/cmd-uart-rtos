@@ -59,3 +59,5 @@ dkms.conf
 # Program output folders
 out/
 .build-log
+html/
+latex/
