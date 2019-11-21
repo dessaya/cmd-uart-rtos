@@ -13,16 +13,13 @@ static void usage() {
         "  help\r\n"
         "  init <freq>\r\n"
         "      Eg: i2c init 400000\r\n"
-        "  write <device_address> <tx_data...>\r\n"
-        "      Eg: i2c write 50 00:00:de:ad:be:ef\r\n"
-        "  read <device_address> <tx_data...> <rx_nbytes>\r\n"
-        "      Eg: i2c read 50 00:00 4\r\n"
+        "  slave <device_address> write <tx_data...> [no]stop\r\n"
+        "      Eg: i2c slave 50 write 00:00:de:ad:be:ef stop\r\n"
+        "  slave <device_address> write <tx_data...> [no]stop read <rx_nbytes> [no]stop\r\n"
+        "      Eg: i2c slave 50 write 00:00 stop read 4 stop\r\n"
+        "  slave <device_address> read <rx_nbytes> [no]stop\r\n"
+        "      Eg: i2c slave 50 read 4 stop\r\n"
     );
-}
-
-/** `i2c help` command handler function. */
-static void i2c_cmd_help_handler(cmd_args_t *args) {
-    usage();
 }
 
 /** Utility macro: check a condition; if it's false, print the command usage help and return. */
@@ -43,7 +40,7 @@ static unsigned int i2c_freq_hz = 0;
 /**
  * `i2c init` command handler function.
  */
-static void i2c_cmd_init_handler(cmd_args_t *args) {
+static void i2c_init(cmd_args_t *args) {
     CMD_ASSERT_USAGE(args->count >= 3);
     int32_t freq = atoi(args->tokens[2]);
     CMD_ASSERT_USAGE(freq >= 0 && freq <= 1000000);
@@ -121,29 +118,6 @@ static bool parse_device_address(const char *s, uint8_t *out) {
     return errno == 0;
 }
 
-/** `i2c write` command handler function. */
-static void i2c_cmd_write_handler(cmd_args_t *args) {
-    if (!i2c_freq_hz) {
-        log_error("`i2c init` must be called first.");
-        return;
-    }
-    CMD_ASSERT_USAGE(args->count >= 4);
-
-    uint8_t device_address;
-    CMD_ASSERT_USAGE(parse_device_address(args->tokens[2], &device_address));
-
-    size_t tx_nbytes;
-    CMD_ASSERT_USAGE(parse_data_nbytes(args->tokens[3], &tx_nbytes));
-
-    uint8_t tx_data[tx_nbytes];
-    CMD_ASSERT_USAGE(parse_data(args->tokens[3], tx_nbytes, tx_data));
-
-    if (!i2cWrite(I2C0, device_address, tx_data, tx_nbytes, true)) {
-        log_error("Failed to write to i2c interface");
-        return;
-    }
-}
-
 /** Print a sequence of bytes in hexadecimal format. */
 static void print_data(uint8_t data[], size_t nbytes) {
     char s[4];
@@ -157,26 +131,35 @@ static void print_data(uint8_t data[], size_t nbytes) {
     terminal_puts("\r\n");
 }
 
-/** `i2c read` command handler. */
-static void i2c_cmd_read_handler(cmd_args_t *args) {
-    if (!i2c_freq_hz) {
-        log_error("`i2c init` must be called first.");
-        return;
+/**
+ * Parse the `[no]stop` argument.
+ *
+ * \param s The input string.
+ * \param out Output variable that will store the boolean stop condition
+ *
+ * \return false if the string cannot be parsed successfully.
+ */
+static bool parse_stop(const char *s, bool *out) {
+    if (!strcmp(s, "stop")) {
+        return *out = true;
+        return true;
     }
-    CMD_ASSERT_USAGE(args->count >= 5);
+    if (!strcmp(s, "nostop")) {
+        return *out = false;
+        return true;
+    }
+    return false;
+}
 
-    uint8_t device_address;
-    CMD_ASSERT_USAGE(parse_device_address(args->tokens[2], &device_address));
-
-    size_t tx_nbytes;
-    CMD_ASSERT_USAGE(parse_data_nbytes(args->tokens[3], &tx_nbytes));
-
-    uint8_t tx_data[tx_nbytes];
-    CMD_ASSERT_USAGE(parse_data(args->tokens[3], tx_nbytes, tx_data));
-
-    int rx_nbytes = atoi(args->tokens[4]);
-    CMD_ASSERT_USAGE(rx_nbytes > 0);
-
+/** Perform a write-read sequence on the slave device and then print the received data.  */
+static void i2c_write_read_print(
+    uint8_t device_address,
+    size_t tx_nbytes,
+    uint8_t tx_data[tx_nbytes],
+    bool tx_stop,
+    size_t rx_nbytes,
+    bool rx_stop
+) {
     uint8_t rx_data[rx_nbytes];
 
     if (!i2cRead(I2C0, device_address, tx_data, tx_nbytes, true, rx_data, rx_nbytes, true)) {
@@ -187,48 +170,81 @@ static void i2c_cmd_read_handler(cmd_args_t *args) {
     print_data(rx_data, rx_nbytes);
 }
 
-/** `i2c <subcommand>` handler function prototype. */
-typedef void (*i2c_cmd_handler_t)(cmd_args_t *args);
+/** `i2c slave <xy> write <data> <[no]stop> read ...` command handler. */
+static void i2c_write_read_cmd(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[tx_nbytes], bool tx_stop, cmd_args_t *args, unsigned int arg_read_index) {
+    CMD_ASSERT_USAGE(args->count - arg_read_index == 3);
+    CMD_ASSERT_USAGE(!strcmp(args->tokens[arg_read_index], "read"));
 
-/** `i2c <subcommand>` description. */
-typedef struct {
-    /** Accepted tokens for `<subcommand>`. Eg: `i2c write` and `i2c w` are equivalent. */
-    char **tokens;
-    /** Subcommand handler function. */
-    i2c_cmd_handler_t handler;
-} i2c_cmd_token_t;
+    int rx_nbytes = atoi(args->tokens[arg_read_index + 1]);
+    CMD_ASSERT_USAGE(rx_nbytes > 0);
 
-/** List of `i2c` subcommands. */
-static i2c_cmd_token_t i2c_cmd_handlers[] = {
-    {(char *[]){"help", 0}, i2c_cmd_help_handler},
-    {(char *[]){"i", "init", 0}, i2c_cmd_init_handler},
-    {(char *[]){"r", "read", 0}, i2c_cmd_read_handler},
-    {(char *[]){"w", "write", 0}, i2c_cmd_write_handler},
-    {0},
-};
+    bool rx_stop;
+    CMD_ASSERT_USAGE(parse_stop(args->tokens[arg_read_index + 2], &rx_stop));
 
-/**
- * Find an `i2c` subcommand given its name.
- *
- * \return the subcommand description, or NULL of not found.
- */
-static i2c_cmd_handler_t find_i2c_cmd(const char *name) {
-    for (i2c_cmd_token_t *s = i2c_cmd_handlers; s->tokens; s++) {
-        for (char **token = s->tokens; *token; token++) {
-            if (!strcmp(*token, name)) {
-                return s->handler;
-            }
-        }
+    i2c_write_read_print(device_address, tx_nbytes, tx_data, tx_stop, rx_nbytes, rx_stop);
+}
+
+/** `i2c slave <xy> write ...` command handler. */
+static void i2c_write_cmd(uint8_t device_address, cmd_args_t *args) {
+    CMD_ASSERT_USAGE(args->count >= 6);
+
+    size_t tx_nbytes;
+    CMD_ASSERT_USAGE(parse_data_nbytes(args->tokens[4], &tx_nbytes));
+
+    uint8_t tx_data[tx_nbytes];
+    CMD_ASSERT_USAGE(parse_data(args->tokens[4], tx_nbytes, tx_data));
+
+    bool tx_stop;
+    CMD_ASSERT_USAGE(parse_stop(args->tokens[5], &tx_stop));
+
+    if (args->count > 6) {
+        i2c_write_read_cmd(device_address, tx_nbytes, tx_data, tx_stop, args, 6);
+        return;
     }
-    return NULL;
+
+    if (!i2cWrite(I2C0, device_address, tx_data, tx_nbytes, true)) {
+        log_error("Failed to write to i2c interface");
+    }
+}
+
+/** `i2c slave <xy> read ...` command handler. */
+static void i2c_read_cmd(uint8_t device_address, cmd_args_t *args) {
+    uint8_t tx_data[1] = {0};
+    i2c_write_read_cmd(device_address, 0, tx_data, true, args, 3);
+}
+
+/** `i2c slave` command handler. */
+static void i2c_slave(cmd_args_t *args) {
+    if (!i2c_freq_hz) {
+        log_error("`i2c init` must be called first.");
+        return;
+    }
+    CMD_ASSERT_USAGE(args->count >= 6);
+
+    uint8_t device_address;
+    CMD_ASSERT_USAGE(parse_device_address(args->tokens[2], &device_address));
+
+    if (!strcmp(args->tokens[3], "write")) {
+        i2c_write_cmd(device_address, args);
+    } else if (!strcmp(args->tokens[3], "read")) {
+        i2c_read_cmd(device_address, args);
+    } else {
+        CMD_ASSERT_USAGE(false);
+    }
 }
 
 /** `i2c` command handler. */
 static void i2c_cmd_handler(cmd_args_t *args) {
     CMD_ASSERT_USAGE(args->count >= 2);
-    i2c_cmd_handler_t command = find_i2c_cmd(args->tokens[1]);
-    CMD_ASSERT_USAGE(command);
-    command(args);
+    if (!strcmp(args->tokens[1], "help")) {
+        usage();
+    } else if (!strcmp(args->tokens[1], "init")) {
+        i2c_init(args);
+    } else if (!strcmp(args->tokens[1], "slave")) {
+        i2c_slave(args);
+    } else {
+        CMD_ASSERT_USAGE(false);
+    }
 }
 
 /** `i2c` command description. */
