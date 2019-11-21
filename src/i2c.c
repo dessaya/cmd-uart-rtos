@@ -5,6 +5,14 @@
 #include "terminal.h"
 #include "sapi.h"
 
+#define RX_DATA_MAX 256
+#define TX_DATA_MAX 256
+
+/** Receive buffer. */
+static uint8_t rx_data[RX_DATA_MAX];
+/** Write buffer. */
+static uint8_t tx_data[TX_DATA_MAX];
+
 /** Print the `i2c` command usage help. */
 static void usage() {
     terminal_puts(
@@ -29,6 +37,10 @@ static void usage() {
         return; \
     } \
 } while (0)
+
+// https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html#Stringizing
+#define str(a) #a
+#define xstr(a) str(a)
 
 /**
  * Global i2c configuration, controlled with `i2c init`.
@@ -151,16 +163,16 @@ static bool parse_stop(const char *s, bool *out) {
     return false;
 }
 
-/** Perform a write-read sequence on the slave device and then print the received data.  */
-static void i2c_write_read_print(
-    uint8_t device_address,
-    size_t tx_nbytes,
-    uint8_t tx_data[tx_nbytes],
-    bool tx_stop,
-    size_t rx_nbytes,
-    bool rx_stop
-) {
-    uint8_t rx_data[rx_nbytes];
+/**
+ * Perform a write-read sequence on the slave device and then print the received data.
+ *
+ * Data to write is taken from the tx_data buffer. Received data is written into the rx_data buffer.
+ */
+static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, bool tx_stop, size_t rx_nbytes, bool rx_stop) {
+    if (rx_nbytes >= RX_DATA_MAX) {
+        log_error("Cannot receive more than " xstr(RX_DATA_MAX) " bytes");
+        return;
+    }
 
     if (!i2cRead(I2C0, device_address, tx_data, tx_nbytes, true, rx_data, rx_nbytes, true)) {
         log_error("Failed to read from i2c interface");
@@ -171,7 +183,7 @@ static void i2c_write_read_print(
 }
 
 /** `i2c slave <xy> write <data> <[no]stop> read ...` command handler. */
-static void i2c_write_read_cmd(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[tx_nbytes], bool tx_stop, cmd_args_t *args, unsigned int arg_read_index) {
+static void i2c_write_read_cmd(uint8_t device_address, size_t tx_nbytes, bool tx_stop, cmd_args_t *args, unsigned int arg_read_index) {
     CMD_ASSERT_USAGE(args->count - arg_read_index == 3);
     CMD_ASSERT_USAGE(!strcmp(args->tokens[arg_read_index], "read"));
 
@@ -181,7 +193,7 @@ static void i2c_write_read_cmd(uint8_t device_address, size_t tx_nbytes, uint8_t
     bool rx_stop;
     CMD_ASSERT_USAGE(parse_stop(args->tokens[arg_read_index + 2], &rx_stop));
 
-    i2c_write_read_print(device_address, tx_nbytes, tx_data, tx_stop, rx_nbytes, rx_stop);
+    i2c_write_read_print(device_address, tx_nbytes, tx_stop, rx_nbytes, rx_stop);
 }
 
 /** `i2c slave <xy> write ...` command handler. */
@@ -191,14 +203,18 @@ static void i2c_write_cmd(uint8_t device_address, cmd_args_t *args) {
     size_t tx_nbytes;
     CMD_ASSERT_USAGE(parse_data_nbytes(args->tokens[4], &tx_nbytes));
 
-    uint8_t tx_data[tx_nbytes];
+    if (tx_nbytes >= TX_DATA_MAX) {
+        log_error("Cannot write more than " xstr(TX_DATA_MAX) " bytes");
+        return;
+    }
+
     CMD_ASSERT_USAGE(parse_data(args->tokens[4], tx_nbytes, tx_data));
 
     bool tx_stop;
     CMD_ASSERT_USAGE(parse_stop(args->tokens[5], &tx_stop));
 
     if (args->count > 6) {
-        i2c_write_read_cmd(device_address, tx_nbytes, tx_data, tx_stop, args, 6);
+        i2c_write_read_cmd(device_address, tx_nbytes, tx_stop, args, 6);
         return;
     }
 
@@ -209,8 +225,7 @@ static void i2c_write_cmd(uint8_t device_address, cmd_args_t *args) {
 
 /** `i2c slave <xy> read ...` command handler. */
 static void i2c_read_cmd(uint8_t device_address, cmd_args_t *args) {
-    uint8_t tx_data[1] = {0};
-    i2c_write_read_cmd(device_address, 0, tx_data, true, args, 3);
+    i2c_write_read_cmd(device_address, 0, true, args, 3);
 }
 
 /** `i2c slave` command handler. */
