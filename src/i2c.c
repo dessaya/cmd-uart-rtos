@@ -5,28 +5,31 @@
 #include "terminal.h"
 #include "sapi.h"
 
+/** Maximum size of receive data buffer (bytes) */
 #define RX_DATA_MAX 256
+/** Maximum size of transmit data buffer (bytes) */
 #define TX_DATA_MAX 256
-
-/** Receive buffer. */
-static uint8_t rx_data[RX_DATA_MAX];
-/** Write buffer. */
-static uint8_t tx_data[TX_DATA_MAX];
 
 /** Print the `i2c` command usage help. */
 static void usage() {
     terminal_puts(
         "Usage: i2c <command> ...\r\n"
+        "\r\n"
         "Commands:\r\n"
+        "\r\n"
         "  help\r\n"
+        "\r\n"
         "  init <freq>\r\n"
         "      Eg: i2c init 400000\r\n"
+        "\r\n"
         "  slave <device_address> write <tx_data...> [no]stop\r\n"
         "      Eg: i2c slave 50 write 00:00:de:ad:be:ef stop\r\n"
+        "\r\n"
         "  slave <device_address> write <tx_data...> [no]stop read <rx_nbytes> [no]stop\r\n"
         "      Eg: i2c slave 50 write 00:00 stop read 4 stop\r\n"
+        "\r\n"
         "  slave <device_address> read <rx_nbytes> [no]stop\r\n"
-        "      Eg: i2c slave 50 read 4 stop\r\n"
+        "      Eg: i2c slave 50 read 4 nostop\r\n"
     );
 }
 
@@ -164,15 +167,64 @@ static bool parse_stop(const char *s, bool *out) {
 }
 
 /**
- * Perform a write-read sequence on the slave device and then print the received data.
+ * Try to parse the `read <rx_nbytes> [no]stop` section of command line.
  *
- * Data to write is taken from the tx_data buffer. Received data is written into the rx_data buffer.
+ * \param args The tokenized comand line arguments
+ * \param token_index The current token index. All previous tokens have already been parsed.
+ * \param rx_nbytes (out) The parsed amount of bytes to read.
+ * \param rx_stop (out) The parsed stop condition.
+ *
+ * \return false if the read section cannot be parsed successfully starting from token_index.
  */
-static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, bool tx_stop, size_t rx_nbytes, bool rx_stop) {
-    if (rx_nbytes >= RX_DATA_MAX) {
+static bool parse_read(const cmd_args_t *args, unsigned token_index, size_t *rx_nbytes, bool *rx_stop) {
+    *rx_nbytes = atoi(args->tokens[token_index + 1]);
+    if (*rx_nbytes >= RX_DATA_MAX) {
         log_error("Cannot receive more than " xstr(RX_DATA_MAX) " bytes");
-        return;
+        return false;
     }
+
+    if (!parse_stop(args->tokens[token_index + 2], rx_stop)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Try to parse the `write <tx_data> [no]stop` section of command line.
+ *
+ * \param args The tokenized comand line arguments
+ * \param token_index The current token index. All previous tokens have already been parsed.
+ * \param tx_nbytes (out) The amount of bytes in the parsed data buffer.
+ * \param tx_data (out) The data buffer that will store the parsed bytes.
+ * \param tx_stop (out) The parsed stop condition.
+ *
+ * \return false if the write section cannot be parsed successfully starting from token_index.
+ */
+static bool parse_write(const cmd_args_t *args, unsigned token_index, size_t *tx_nbytes, uint8_t tx_data[], bool *tx_stop) {
+    if (!parse_data_nbytes(args->tokens[4], tx_nbytes)) {
+        return false;
+    }
+
+    if (*tx_nbytes >= TX_DATA_MAX) {
+        log_error("Cannot write more than " xstr(TX_DATA_MAX) " bytes");
+        return false;
+    }
+
+    if (!parse_data(args->tokens[4], *tx_nbytes, tx_data)) {
+        return false;
+    }
+
+    if (!parse_stop(args->tokens[token_index + 2], tx_stop)) {
+        return false;
+    }
+
+    return true;
+}
+
+/** Perform a write-read sequence on the I2C slave device and then print the received data. */
+static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[], bool tx_stop, size_t rx_nbytes, bool rx_stop) {
+    static uint8_t rx_data[RX_DATA_MAX];
 
     if (!i2cRead(I2C0, device_address, tx_data, tx_nbytes, true, rx_data, rx_nbytes, true)) {
         log_error("Failed to read from i2c interface");
@@ -182,53 +234,14 @@ static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, bool 
     print_data(rx_data, rx_nbytes);
 }
 
-/** `i2c slave <xy> write <data> <[no]stop> read ...` command handler. */
-static void i2c_write_read_cmd(uint8_t device_address, size_t tx_nbytes, bool tx_stop, cmd_args_t *args, unsigned int arg_read_index) {
-    CMD_ASSERT_USAGE(args->count - arg_read_index == 3);
-    CMD_ASSERT_USAGE(!strcmp(args->tokens[arg_read_index], "read"));
-
-    int rx_nbytes = atoi(args->tokens[arg_read_index + 1]);
-    CMD_ASSERT_USAGE(rx_nbytes > 0);
-
-    bool rx_stop;
-    CMD_ASSERT_USAGE(parse_stop(args->tokens[arg_read_index + 2], &rx_stop));
-
-    i2c_write_read_print(device_address, tx_nbytes, tx_stop, rx_nbytes, rx_stop);
-}
-
-/** `i2c slave <xy> write ...` command handler. */
-static void i2c_write_cmd(uint8_t device_address, cmd_args_t *args) {
-    CMD_ASSERT_USAGE(args->count >= 6);
-
-    size_t tx_nbytes;
-    CMD_ASSERT_USAGE(parse_data_nbytes(args->tokens[4], &tx_nbytes));
-
-    if (tx_nbytes >= TX_DATA_MAX) {
-        log_error("Cannot write more than " xstr(TX_DATA_MAX) " bytes");
-        return;
-    }
-
-    CMD_ASSERT_USAGE(parse_data(args->tokens[4], tx_nbytes, tx_data));
-
-    bool tx_stop;
-    CMD_ASSERT_USAGE(parse_stop(args->tokens[5], &tx_stop));
-
-    if (args->count > 6) {
-        i2c_write_read_cmd(device_address, tx_nbytes, tx_stop, args, 6);
-        return;
-    }
-
-    if (!i2cWrite(I2C0, device_address, tx_data, tx_nbytes, true)) {
+/** Perform a write on the I2C slave device. */
+static void i2c_write(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[], bool stop) {
+    if (!i2cWrite(I2C0, device_address, tx_data, tx_nbytes, stop)) {
         log_error("Failed to write to i2c interface");
     }
 }
 
-/** `i2c slave <xy> read ...` command handler. */
-static void i2c_read_cmd(uint8_t device_address, cmd_args_t *args) {
-    i2c_write_read_cmd(device_address, 0, true, args, 3);
-}
-
-/** `i2c slave` command handler. */
+/** `i2c slave ...` command handler. */
 static void i2c_slave(cmd_args_t *args) {
     if (!i2c_freq_hz) {
         log_error("`i2c init` must be called first.");
@@ -239,13 +252,38 @@ static void i2c_slave(cmd_args_t *args) {
     uint8_t device_address;
     CMD_ASSERT_USAGE(parse_device_address(args->tokens[2], &device_address));
 
-    if (!strcmp(args->tokens[3], "write")) {
-        i2c_write_cmd(device_address, args);
-    } else if (!strcmp(args->tokens[3], "read")) {
-        i2c_read_cmd(device_address, args);
-    } else {
-        CMD_ASSERT_USAGE(false);
+    // arguments for `write` section
+    size_t tx_nbytes = 0;
+    static uint8_t tx_data[TX_DATA_MAX];
+    bool tx_stop = true;
+
+    // arguments for `read` section
+    size_t rx_nbytes = 0;
+    bool rx_stop = true;
+
+    if (!strcmp(args->tokens[3], "read") && args->count == 6) {
+        // i2c slave <device_address> read <rx_nbytes> [no]stop
+        CMD_ASSERT_USAGE(parse_read(args, 3, &rx_nbytes, &rx_stop));
+        i2c_write_read_print(device_address, tx_nbytes, tx_data, tx_stop, rx_nbytes, rx_stop);
+        return;
     }
+
+    if (!strcmp(args->tokens[3], "write") && args->count == 6) {
+        // i2c slave <device_address> write <tx_data...> [no]stop
+        CMD_ASSERT_USAGE(parse_write(args, 3, &tx_nbytes, tx_data, &tx_stop));
+        i2c_write(device_address, tx_nbytes, tx_data, tx_stop);
+        return;
+    }
+
+    if (!strcmp(args->tokens[3], "write") && !strcmp(args->tokens[6], "read") && args->count == 9) {
+        // i2c slave <device_address> write <tx_data...> [no]stop read <rx_nbytes> [no]stop
+        CMD_ASSERT_USAGE(parse_write(args, 3, &tx_nbytes, tx_data, &tx_stop));
+        CMD_ASSERT_USAGE(parse_read(args, 6, &rx_nbytes, &rx_stop));
+        i2c_write_read_print(device_address, tx_nbytes, tx_data, tx_stop, rx_nbytes, rx_stop);
+        return;
+    }
+
+    CMD_ASSERT_USAGE(false);
 }
 
 /** `i2c` command handler. */
@@ -262,7 +300,6 @@ static void i2c_cmd_handler(cmd_args_t *args) {
     }
 }
 
-/** `i2c` command description. */
 const cmd_t i2c_command = {
     .name = "i2c",
     .description = "Control the I2C interface",

@@ -23,12 +23,6 @@ static void help_cmd_handler(cmd_args_t *args) {
     print_help();
 }
 
-const cmd_t help_command = {
-    .name = "help",
-    .description = "List available commands",
-    .handler = help_cmd_handler,
-};
-
 /** Parse a command sentence into a cmd_args_t struct. */
 static void parse(char *line, cmd_args_t *out) {
     *out = (cmd_args_t){{0}, 0};
@@ -42,7 +36,7 @@ static void parse(char *line, cmd_args_t *out) {
 }
 
 /** Remove `\r\n`. \return false if no newline characters were found. */
-bool str_rstrip(char s[]) {
+static bool str_rstrip(char s[]) {
     for (size_t i = 0; s[i]; i++) {
         if (s[i] == '\n' || s[i] == '\r') {
             s[i] = '\0';
@@ -66,23 +60,28 @@ static void cli_task(void *param) {
     while (1) {
         terminal_puts("$ ");
 
-        #define LINE_LENGTH 80
+        #define CLI_LINE_MAX 80
+        static char line[CLI_LINE_MAX];
 
-        static char line[LINE_LENGTH];
-        terminal_gets(line, sizeof(line));
+        terminal_gets(line, CLI_LINE_MAX);
         if (!str_rstrip(line)) { // remove \r\n
             log_error("Line is too long.");
+
             // discard the rest of the line
             do {
                 terminal_gets(line, sizeof(line));
             } while (!str_rstrip(line));
+
+            continue;
         }
 
         static cmd_args_t args;
         parse(line, &args);
+
         if (args.count == 0) {
             continue;
         }
+
         if (args.count >= CLI_ARGC_MAX) {
             log_error("Too many arguments.");
             continue;
@@ -115,3 +114,10 @@ bool cli_init() {
 
     return true;
 }
+
+const cmd_t help_command = {
+    .name = "help",
+    .description = "List available commands",
+    .handler = help_cmd_handler,
+};
+

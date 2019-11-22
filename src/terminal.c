@@ -77,11 +77,13 @@ void terminal_gets(char *buf, size_t bufsize) {
 bool terminal_init() {
     rxQueue = xQueueCreate(RXQUEUE_CAPACITY, sizeof(char));
     if (rxQueue == NULL) {
+        log_error("Failed to create rxQueue");
         return false;
     }
 
     txQueue = xQueueCreate(TXQUEUE_CAPACITY, sizeof(char));
     if (txQueue == NULL) {
+        log_error("Failed to create txQueue");
         return false;
     }
 
