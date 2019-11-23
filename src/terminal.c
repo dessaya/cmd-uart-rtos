@@ -20,8 +20,12 @@ static QueueHandle_t txQueue;
  */
 static void uart_rx_isr(void *unused)
 {
-   char c = uartRxRead(UART_PORT);
-   xQueueSendToBackFromISR(rxQueue, &c, NULL);
+    BaseType_t higher_priority_task_woken = pdFALSE;
+
+    char c = uartRxRead(UART_PORT);
+    xQueueSendToBackFromISR(rxQueue, &c, &higher_priority_task_woken);
+
+    portYIELD_FROM_ISR(higher_priority_task_woken)
 }
 
 /**

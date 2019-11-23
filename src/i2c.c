@@ -116,6 +116,19 @@ static bool parse_data(const char *data_hex, uint8_t nbytes, uint8_t out[]) {
     return true;
 }
 
+/** Print a sequence of bytes in hexadecimal format. */
+static void print_data(uint8_t data[], size_t nbytes) {
+    char s[4];
+    for (int i = 0; i < nbytes; i++) {
+        sprintf(s, "%02x:", data[i]);
+        if (i == nbytes - 1) {
+            s[2] = '\0';
+        }
+        terminal_puts(s);
+    }
+    terminal_puts("\r\n");
+}
+
 /**
  * Parse a 7-bit i2c device addres in hex format (eg: `"5a"`).
  *
@@ -131,19 +144,6 @@ static bool parse_device_address(const char *s, uint8_t *out) {
     errno = 0;
     *out = strtol(s, NULL, 16);
     return errno == 0;
-}
-
-/** Print a sequence of bytes in hexadecimal format. */
-static void print_data(uint8_t data[], size_t nbytes) {
-    char s[4];
-    for (int i = 0; i < nbytes; i++) {
-        sprintf(s, "%02x:", data[i]);
-        if (i == nbytes - 1) {
-            s[2] = '\0';
-        }
-        terminal_puts(s);
-    }
-    terminal_puts("\r\n");
 }
 
 /**
@@ -182,12 +182,7 @@ static bool parse_read(const cmd_args_t *args, unsigned token_index, size_t *rx_
         log_error("Cannot receive more than " xstr(RX_DATA_MAX) " bytes");
         return false;
     }
-
-    if (!parse_stop(args->tokens[token_index + 2], rx_stop)) {
-        return false;
-    }
-
-    return true;
+    return parse_stop(args->tokens[token_index + 2], rx_stop);
 }
 
 /**
@@ -202,24 +197,17 @@ static bool parse_read(const cmd_args_t *args, unsigned token_index, size_t *rx_
  * \return false if the write section cannot be parsed successfully starting from token_index.
  */
 static bool parse_write(const cmd_args_t *args, unsigned token_index, size_t *tx_nbytes, uint8_t tx_data[], bool *tx_stop) {
-    if (!parse_data_nbytes(args->tokens[4], tx_nbytes)) {
+    if (!parse_data_nbytes(args->tokens[token_index + 1], tx_nbytes)) {
         return false;
     }
-
     if (*tx_nbytes >= TX_DATA_MAX) {
         log_error("Cannot write more than " xstr(TX_DATA_MAX) " bytes");
         return false;
     }
-
-    if (!parse_data(args->tokens[4], *tx_nbytes, tx_data)) {
+    if (!parse_data(args->tokens[token_index + 1], *tx_nbytes, tx_data)) {
         return false;
     }
-
-    if (!parse_stop(args->tokens[token_index + 2], tx_stop)) {
-        return false;
-    }
-
-    return true;
+    return parse_stop(args->tokens[token_index + 2], tx_stop);
 }
 
 /** Perform a write-read sequence on the I2C slave device and then print the received data. */
