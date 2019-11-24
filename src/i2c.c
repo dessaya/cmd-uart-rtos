@@ -22,24 +22,16 @@ static void usage() {
         "  init <freq>\r\n"
         "      Eg: i2c init 400000\r\n"
         "\r\n"
-        "  slave <device_address> write <tx_data...> [no]stop\r\n"
-        "      Eg: i2c slave 50 write 00:00:de:ad:be:ef stop\r\n"
+        "  slave <device_address> tx <tx_data...> [no]stop\r\n"
+        "      Eg: i2c slave 50 tx 00:00:de:ad:be:ef stop\r\n"
         "\r\n"
-        "  slave <device_address> write <tx_data...> [no]stop read <rx_nbytes> [no]stop\r\n"
-        "      Eg: i2c slave 50 write 00:00 stop read 4 stop\r\n"
+        "  slave <device_address> tx <tx_data...> [no]stop rx <rx_nbytes> [no]stop\r\n"
+        "      Eg: i2c slave 50 tx 00:00 stop rx 4 stop\r\n"
         "\r\n"
-        "  slave <device_address> read <rx_nbytes> [no]stop\r\n"
-        "      Eg: i2c slave 50 read 4 nostop\r\n"
+        "  slave <device_address> rx <rx_nbytes> [no]stop\r\n"
+        "      Eg: i2c slave 50 rx 4 nostop\r\n"
     );
 }
-
-/** Utility macro: check a condition; if it's false, print the command usage help and return. */
-#define CMD_ASSERT_USAGE(cond) do { \
-    if (!(cond)) { \
-        usage(); \
-        return; \
-    } \
-} while (0)
 
 // https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html#Stringizing
 #define str(a) #a
@@ -56,9 +48,9 @@ static unsigned int i2c_freq_hz = 0;
  * `i2c init` command handler function.
  */
 static void i2c_init(cmd_args_t *args) {
-    CMD_ASSERT_USAGE(args->count >= 3);
+    cli_assert(args->count >= 3, usage);
     int32_t freq = atoi(args->tokens[2]);
-    CMD_ASSERT_USAGE(freq >= 0 && freq <= 1000000);
+    cli_assert(freq >= 0 && freq <= 1000000, usage);
     i2c_freq_hz = freq;
     if (i2c_freq_hz > 0) {
         if (!i2cInit(I2C0, i2c_freq_hz)) {
@@ -167,14 +159,14 @@ static bool parse_stop(const char *s, bool *out) {
 }
 
 /**
- * Try to parse the `read <rx_nbytes> [no]stop` section of command line.
+ * Try to parse the `rx <rx_nbytes> [no]stop` section of command line.
  *
  * \param args The tokenized comand line arguments
  * \param token_index The current token index. All previous tokens have already been parsed.
  * \param rx_nbytes (out) The parsed amount of bytes to read.
  * \param rx_stop (out) The parsed stop condition.
  *
- * \return false if the read section cannot be parsed successfully starting from token_index.
+ * \return false if the rx section cannot be parsed successfully starting from token_index.
  */
 static bool parse_read(const cmd_args_t *args, unsigned token_index, size_t *rx_nbytes, bool *rx_stop) {
     *rx_nbytes = atoi(args->tokens[token_index + 1]);
@@ -186,7 +178,7 @@ static bool parse_read(const cmd_args_t *args, unsigned token_index, size_t *rx_
 }
 
 /**
- * Try to parse the `write <tx_data> [no]stop` section of command line.
+ * Try to parse the `tx <tx_data> [no]stop` section of command line.
  *
  * \param args The tokenized comand line arguments
  * \param token_index The current token index. All previous tokens have already been parsed.
@@ -194,14 +186,14 @@ static bool parse_read(const cmd_args_t *args, unsigned token_index, size_t *rx_
  * \param tx_data (out) The data buffer that will store the parsed bytes.
  * \param tx_stop (out) The parsed stop condition.
  *
- * \return false if the write section cannot be parsed successfully starting from token_index.
+ * \return false if the tx section cannot be parsed successfully starting from token_index.
  */
 static bool parse_write(const cmd_args_t *args, unsigned token_index, size_t *tx_nbytes, uint8_t tx_data[], bool *tx_stop) {
     if (!parse_data_nbytes(args->tokens[token_index + 1], tx_nbytes)) {
         return false;
     }
     if (*tx_nbytes >= TX_DATA_MAX) {
-        log_error("Cannot write more than " xstr(TX_DATA_MAX) " bytes");
+        log_error("Cannot tx more than " xstr(TX_DATA_MAX) " bytes");
         return false;
     }
     if (!parse_data(args->tokens[token_index + 1], *tx_nbytes, tx_data)) {
@@ -215,17 +207,17 @@ static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, uint8
     static uint8_t rx_data[RX_DATA_MAX];
 
     if (!i2cRead(I2C0, device_address, tx_data, tx_nbytes, true, rx_data, rx_nbytes, true)) {
-        log_error("Failed to read from i2c interface");
+        log_error("Failed to read from i2c device");
         return;
     }
 
     print_data(rx_data, rx_nbytes);
 }
 
-/** Perform a write on the I2C slave device. */
+/** Transmit data to the I2C slave device. */
 static void i2c_write(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[], bool stop) {
     if (!i2cWrite(I2C0, device_address, tx_data, tx_nbytes, stop)) {
-        log_error("Failed to write to i2c interface");
+        log_error("Failed to write to i2c device");
     }
 }
 
@@ -235,48 +227,48 @@ static void i2c_slave(cmd_args_t *args) {
         log_error("`i2c init` must be called first.");
         return;
     }
-    CMD_ASSERT_USAGE(args->count >= 6);
+    cli_assert(args->count >= 6, usage);
 
     uint8_t device_address;
-    CMD_ASSERT_USAGE(parse_device_address(args->tokens[2], &device_address));
+    cli_assert(parse_device_address(args->tokens[2], &device_address), usage);
 
-    // arguments for `write` section
+    // arguments for `tx` section
     size_t tx_nbytes = 0;
     static uint8_t tx_data[TX_DATA_MAX];
     bool tx_stop = true;
 
-    // arguments for `read` section
+    // arguments for `rx` section
     size_t rx_nbytes = 0;
     bool rx_stop = true;
 
-    if (!strcmp(args->tokens[3], "read") && args->count == 6) {
-        // i2c slave <device_address> read <rx_nbytes> [no]stop
-        CMD_ASSERT_USAGE(parse_read(args, 3, &rx_nbytes, &rx_stop));
+    if (!strcmp(args->tokens[3], "rx") && args->count == 6) {
+        // i2c slave <device_address> rx <rx_nbytes> [no]stop
+        cli_assert(parse_read(args, 3, &rx_nbytes, &rx_stop), usage);
         i2c_write_read_print(device_address, tx_nbytes, tx_data, tx_stop, rx_nbytes, rx_stop);
         return;
     }
 
-    if (!strcmp(args->tokens[3], "write") && args->count == 6) {
-        // i2c slave <device_address> write <tx_data...> [no]stop
-        CMD_ASSERT_USAGE(parse_write(args, 3, &tx_nbytes, tx_data, &tx_stop));
+    if (!strcmp(args->tokens[3], "tx") && args->count == 6) {
+        // i2c slave <device_address> tx <tx_data...> [no]stop
+        cli_assert(parse_write(args, 3, &tx_nbytes, tx_data, &tx_stop), usage);
         i2c_write(device_address, tx_nbytes, tx_data, tx_stop);
         return;
     }
 
-    if (!strcmp(args->tokens[3], "write") && !strcmp(args->tokens[6], "read") && args->count == 9) {
-        // i2c slave <device_address> write <tx_data...> [no]stop read <rx_nbytes> [no]stop
-        CMD_ASSERT_USAGE(parse_write(args, 3, &tx_nbytes, tx_data, &tx_stop));
-        CMD_ASSERT_USAGE(parse_read(args, 6, &rx_nbytes, &rx_stop));
+    if (!strcmp(args->tokens[3], "tx") && !strcmp(args->tokens[6], "rx") && args->count == 9) {
+        // i2c slave <device_address> tx <tx_data...> [no]stop rx <rx_nbytes> [no]stop
+        cli_assert(parse_write(args, 3, &tx_nbytes, tx_data, &tx_stop), usage);
+        cli_assert(parse_read(args, 6, &rx_nbytes, &rx_stop), usage);
         i2c_write_read_print(device_address, tx_nbytes, tx_data, tx_stop, rx_nbytes, rx_stop);
         return;
     }
 
-    CMD_ASSERT_USAGE(false);
+    cli_assert(false, usage);
 }
 
 /** `i2c` command handler. */
 static void i2c_cmd_handler(cmd_args_t *args) {
-    CMD_ASSERT_USAGE(args->count >= 2);
+    cli_assert(args->count >= 2, usage);
     if (!strcmp(args->tokens[1], "help")) {
         usage();
     } else if (!strcmp(args->tokens[1], "init")) {
@@ -284,7 +276,7 @@ static void i2c_cmd_handler(cmd_args_t *args) {
     } else if (!strcmp(args->tokens[1], "slave")) {
         i2c_slave(args);
     } else {
-        CMD_ASSERT_USAGE(false);
+        cli_assert(false, usage);
     }
 }
 

@@ -3,11 +3,13 @@
 #include "commands.h"
 #include "gpio.h"
 #include "echo.h"
+#include "sleep.h"
 #include "i2c.h"
 
 const cmd_t *commands[] = {
     &help_command,
     &echo_command,
+    &sleep_command,
     &gpio_command,
     &i2c_command,
     0,

@@ -19,14 +19,6 @@ static void usage() {
     );
 }
 
-/** Utility macro: check a condition; if it's false, print the command usage help and return. */
-#define CMD_ASSERT_USAGE(cond) do { \
-    if (!(cond)) { \
-        usage(); \
-        return; \
-    } \
-} while (0)
-
 /** GPIO port description and state. */
 typedef struct {
     /** GPIO port name. */
@@ -118,9 +110,9 @@ static void gpio_cmd_read_handler(port_t *port, cmd_args_t *args) {
 
 /** `gpio <port> write` command handler function. */
 static void gpio_cmd_write_handler(port_t *port, cmd_args_t *args) {
-    CMD_ASSERT_USAGE(args->count >= 4);
+    cli_assert(args->count >= 4, usage);
     bool_t on_off;
-    CMD_ASSERT_USAGE(parse_on_off_value(args->tokens[3], &on_off));
+    cli_assert(parse_on_off_value(args->tokens[3], &on_off), usage);
     gpioWrite(port->pin, on_off);
 }
 
@@ -145,9 +137,9 @@ static void gpio_blink_task(void *param) {
 
 /** `gpio <port> blink` command handler function. */
 static void gpio_cmd_blink_handler(port_t *port, cmd_args_t *args) {
-    CMD_ASSERT_USAGE(args->count >= 4);
+    cli_assert(args->count >= 4, usage);
     int period = atoi(args->tokens[3]);
-    CMD_ASSERT_USAGE(period >= 0);
+    cli_assert(period >= 0, usage);
 
     if (port->blink_task) {
         vTaskDelete(port->blink_task);
@@ -212,16 +204,16 @@ static gpio_cmd_handler_t find_gpio_cmd(const char *name) {
 
 /** `gpio` command handler function. */
 static void gpio_cmd_handler(cmd_args_t *args) {
-    CMD_ASSERT_USAGE(args->count >= 2);
+    cli_assert(args->count >= 2, usage);
     if (!strcmp(args->tokens[1], "help")) {
         usage();
         return;
     }
-    CMD_ASSERT_USAGE(args->count >= 3);
+    cli_assert(args->count >= 3, usage);
     port_t *port = find_port(args->tokens[1]);
-    CMD_ASSERT_USAGE(port);
+    cli_assert(port, usage);
     gpio_cmd_handler_t command = find_gpio_cmd(args->tokens[2]);
-    CMD_ASSERT_USAGE(command);
+    cli_assert(command, usage);
     command(port, args);
 }
 

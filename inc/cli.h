@@ -39,5 +39,18 @@ bool cli_init();
 /** `help` command definition. */
 extern const cmd_t help_command;
 
+/**
+ * Utility macro: check a condition; if it's false, print an error message,
+ * execute the given commands and return.
+ */
+#define cli_assert(cond, usage) do { \
+    if (!(cond)) { \
+        terminal_println("Error: Invalid command."); \
+        terminal_println(""); \
+        usage(); \
+        return; \
+    } \
+} while (0)
+
 #endif
 

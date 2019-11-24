@@ -1,4 +1,4 @@
-#include "gpio.h"
+#include "echo.h"
 #include "terminal.h"
 
 /** `echo` command handler function. */
