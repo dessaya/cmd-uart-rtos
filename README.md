@@ -19,6 +19,7 @@ Los módulos (pares de archivos `.c` y `.h`) principales son:
 * `cli` controla la línea de comandos.
 * `commands` contiene la lista de comandos incluidos.
 * `echo` implementa el comando `echo`.
+* `sleep` implementa el comando `sleep`.
 * `gpio` implementa el comando `gpio`, que permite leer/escribir en puertos
   GPIO.
 * `i2c` implementa el comando `i2c`, que permite interactuar con cualquier
