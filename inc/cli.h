@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 
+/** Maximum length of a command line. */
+#define CLI_LINE_MAX 80
+
 /** Maximum amount of arguments for any given command. */
 #define CLI_ARGC_MAX 10
 
@@ -14,7 +17,9 @@
  * `count = 4`.
  */
 typedef struct {
-    /** Command arguments (`tokens[0]` would be the command itself). */
+    /** Command line buffer. Arguments are separated by null characters. */
+    char buf[CLI_LINE_MAX];
+    /** Pointers to the first character of each argument (`tokens[0]` would be the command name). */
     char *tokens[CLI_ARGC_MAX];
     /** Amount of arguments (including the command itself). */
     int count;
@@ -38,6 +43,12 @@ bool cli_init();
 
 /** `help` command definition. */
 extern const cmd_t help_command;
+
+/** Extract a subcommand starting from a given argument index. */
+void cli_extract_subcommand(const cmd_args_t *cmd, unsigned subcmd_arg_index, cmd_args_t *subcmd);
+
+/** Execute the command. */
+void cli_exec_command(cmd_args_t *args);
 
 /**
  * Utility macro: check a condition; if it's false, print an error message,

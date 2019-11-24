@@ -45,13 +45,13 @@ void terminal_putc(const char c) {
     xQueueSendToBack(txQueue, &c, portMAX_DELAY);
 }
 
-void terminal_puts(const char *s) {
+void terminal_puts(const char s[]) {
     for (; *s; s++) {
         terminal_putc(*s);
     }
 }
 
-void terminal_println(const char *s) {
+void terminal_println(const char s[]) {
     terminal_puts(s);
     terminal_putc('\r');
     terminal_putc('\n');
@@ -63,7 +63,7 @@ char terminal_getc() {
     return c;
 }
 
-void terminal_gets(char *buf, size_t bufsize) {
+void terminal_gets(char buf[], size_t bufsize) {
     if (bufsize == 0) {
         return;
     }

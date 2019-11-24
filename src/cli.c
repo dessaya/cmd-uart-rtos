@@ -23,15 +23,15 @@ static void help_cmd_handler(cmd_args_t *args) {
     print_help();
 }
 
-/** Parse a command sentence into a cmd_args_t struct. */
-static void parse(char *line, cmd_args_t *out) {
-    *out = (cmd_args_t){{0}, 0};
+/** Parse the command line tokens, replacing spaces with null characters in the buffer. */
+static void parse_arguments(cmd_args_t *args) {
+    args->count = 0;
     for (
-        char *token = strtok(line, " \t");
-        token && out->count < CLI_ARGC_MAX - 1;
+        char *token = strtok(args->buf, " \t");
+        token && args->count < CLI_ARGC_MAX - 1;
         token = strtok(NULL, " \t")
     ) {
-        out->tokens[out->count++] = token;
+        args->tokens[args->count++] = token;
     }
 }
 
@@ -46,6 +46,25 @@ static bool str_rstrip(char s[]) {
     return false;
 }
 
+void cli_extract_subcommand(const cmd_args_t *cmd, unsigned subcmd_arg_index, cmd_args_t *subcmd) {
+    memcpy(subcmd->buf, cmd->buf, CLI_LINE_MAX);
+    subcmd->count = cmd->count - subcmd_arg_index;
+    for (int i = 0; i < subcmd->count; i++) {
+        subcmd->tokens[i] = cmd->tokens[subcmd_arg_index + i];
+    }
+}
+
+void cli_exec_command(cmd_args_t *args) {
+    const cmd_t *cmd = find_command(args->tokens[0]);
+    if (!cmd) {
+        terminal_puts("Unknown command: '");
+        terminal_puts(args->tokens[0]);
+        terminal_println("'. Type 'help' to see a list of available commands.");
+        return;
+    }
+    cmd->handler(args);
+}
+
 /**
  * RTOS task for the command line interface.
  *
@@ -57,26 +76,24 @@ static void cli_task(void *param) {
     terminal_println("RTOS CLI initialized.");
     print_help();
 
+    static cmd_args_t args = {0};
+
     while (1) {
         terminal_puts("$ ");
 
-        #define CLI_LINE_MAX 80
-        static char line[CLI_LINE_MAX];
-
-        terminal_gets(line, CLI_LINE_MAX);
-        if (!str_rstrip(line)) { // remove \r\n
+        terminal_gets(args.buf, CLI_LINE_MAX);
+        if (!str_rstrip(args.buf)) { // remove \r\n
             log_error("Line is too long.");
 
             // discard the rest of the line
             do {
-                terminal_gets(line, sizeof(line));
-            } while (!str_rstrip(line));
+                terminal_gets(args.buf, CLI_LINE_MAX);
+            } while (!str_rstrip(args.buf));
 
             continue;
         }
 
-        static cmd_args_t args;
-        parse(line, &args);
+        parse_arguments(&args);
 
         if (args.count == 0) {
             continue;
@@ -87,15 +104,7 @@ static void cli_task(void *param) {
             continue;
         }
 
-        const cmd_t *cmd = find_command(args.tokens[0]);
-        if (!cmd) {
-            terminal_puts("Unknown command: '");
-            terminal_puts(line);
-            terminal_println("'. Type 'help' to see a list of available commands.");
-            continue;
-        }
-
-        cmd->handler(&args);
+        cli_exec_command(&args);
     }
 }
 
@@ -120,4 +129,3 @@ const cmd_t help_command = {
     .description = "List available commands",
     .handler = help_cmd_handler,
 };
-
