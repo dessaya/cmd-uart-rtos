@@ -50,4 +50,4 @@ Además hay dos manejadores de interrupcion:
   entrada de la UART y envía los datos recibidos a la cola `rxQueue`.
 * Cuatro ISRs en el módulo `irq` (`GPIO<n>_IRQHandler`), que se ejecutan mediante los puertos GPIO.
 
-![Diagrama de componentes RTOS](/rtos.svg?raw=true)
+![Diagrama de componentes RTOS](./rtos.svg)
