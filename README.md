@@ -8,7 +8,8 @@ El firmware corre sobre la placa de desarrollo [EDU-CIAA-NXP](http://www.proyect
 y para compilar es necesario utilizar [Firmware v3](https://github.com/epernia/firmware_v3).
 
 El objetivo del firmware es simular una línea de comandos simple mediante la
-UART, corriendo en [FreeRTOS](https://www.freertos.org/). El funcionamiento se describe en el documento de
+UART, corriendo en [FreeRTOS](https://www.freertos.org/). El funcionamiento
+planeado originalmente se describe en el documento de
 [propuesta de TP](https://docs.google.com/document/d/1LrijnJ_BgH8jhwjd66099hUURDXS5GVRP1gTCUJkr28/edit?usp=sharing).
 
 La documentación se puede generar con el comando `doxygen Doxyfile`.
@@ -48,3 +49,5 @@ Además hay dos manejadores de interrupcion:
 * Un ISR en el módulo `terminal` llamado `uart_rx_isr` que controla la
   entrada de la UART y envía los datos recibidos a la cola `rxQueue`.
 * Cuatro ISRs en el módulo `irq` (`GPIO<n>_IRQHandler`), que se ejecutan mediante los puertos GPIO.
+
+![Diagrama de componentes RTOS](/rtos.svg?raw=true)
