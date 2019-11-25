@@ -1,46 +1,52 @@
 #include <string.h>
 #include <assert.h>
 #include "gpio.h"
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "sapi.h"
 #include "terminal.h"
-#include "gpio-interrupt.h"
-#include "gpio-blink.h"
 
-void gpio_usage() {
+/** Print the `gpio` command usage help. */
+static void gpio_usage() {
     terminal_puts(
         "Usage: gpio <pin> <command> ...\r\n"
         "Examples:\r\n"
         "  gpio TEC1 read\r\n"
-        "  gpio TEC1 interrupt falling echo hello\r\n"
-        "  gpio TEC1 interrupt disable\r\n"
         "  gpio LEDB write 1\r\n"
-        "  gpio LED1 blink 2000\r\n"
         "  gpio LEDR toggle\r\n"
     );
 }
 
+/** GPIO port description and state. */
+typedef struct {
+    /** GPIO port name. */
+    char *name;
+    /** GPIO port pin number. */
+    gpioMap_t pin;
+    /** Mutex to synchronize concurrent access. */
+    SemaphoreHandle_t mutex;
+} gpio_port_t;
+
 /** Utility macro to initialize the ports list. */
-#define MAKE_PORT(gpio_port, cport, cpin) { \
+#define MAKE_PORT(gpio_port) { \
     .name = #gpio_port, \
     .pin = gpio_port, \
-    .blink_task_name = #gpio_port " blink task", \
-    .blink_task = 0, \
-    .chip_port = cport, \
-    .chip_pin = cpin, \
+    .mutex = NULL, \
 }
 
 /** List of supported GPIO ports. */
 static gpio_port_t ports[] = {
-    MAKE_PORT(TEC1, 0, 4),
-    MAKE_PORT(TEC2, 0, 8),
-    MAKE_PORT(TEC3, 0, 9),
-    MAKE_PORT(TEC4, 1, 9),
+    MAKE_PORT(TEC1),
+    MAKE_PORT(TEC2),
+    MAKE_PORT(TEC3),
+    MAKE_PORT(TEC4),
 
-    MAKE_PORT(LEDR, 5, 0),
-    MAKE_PORT(LEDG, 5, 1),
-    MAKE_PORT(LEDB, 5, 2),
-    MAKE_PORT(LED1, 0, 14),
-    MAKE_PORT(LED2, 1, 11),
-    MAKE_PORT(LED3, 1, 12),
+    MAKE_PORT(LEDR),
+    MAKE_PORT(LEDG),
+    MAKE_PORT(LEDB),
+    MAKE_PORT(LED1),
+    MAKE_PORT(LED2),
+    MAKE_PORT(LED3),
     {0},
 };
 
@@ -58,7 +64,8 @@ static gpio_port_t *find_port(const char *name) {
     return NULL;
 }
 
-bool gpio_take_mutex(gpio_port_t *port, unsigned milliseconds) {
+/** Take the mutex for the given port. */
+static bool gpio_take_mutex(gpio_port_t *port, unsigned milliseconds) {
     if (xSemaphoreTake(port->mutex, pdMS_TO_TICKS(milliseconds)) == pdFALSE) {
         log_error("Failed to take mutex");
         return false;
@@ -66,7 +73,8 @@ bool gpio_take_mutex(gpio_port_t *port, unsigned milliseconds) {
     return true;
 }
 
-bool gpio_release_mutex(gpio_port_t *port) {
+/** Release the mutex for the given port. */
+static bool gpio_release_mutex(gpio_port_t *port) {
     if (xSemaphoreGive(port->mutex) == pdFALSE) {
         log_error("Failed to release mutex");
         return false;
@@ -164,8 +172,6 @@ static gpio_cmd_token_t gpio_cmd_handlers[] = {
     {(char *[]){"r", "read", 0}, gpio_read_cmd_handler},
     {(char *[]){"w", "write", 0}, gpio_write_cmd_handler},
     {(char *[]){"t", "toggle", 0}, gpio_toggle_cmd_handler},
-    {(char *[]){"b", "blink", 0}, gpio_blink_cmd_handler},
-    {(char *[]){"i", "interrupt", 0}, gpio_interrupt_cmd_handler},
     {0},
 };
 

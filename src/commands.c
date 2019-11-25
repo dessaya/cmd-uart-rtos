@@ -1,16 +1,20 @@
 #include <stddef.h>
 #include <string.h>
 #include "commands.h"
-#include "gpio.h"
 #include "echo.h"
 #include "sleep.h"
+#include "loop.h"
+#include "gpio.h"
+#include "irq.h"
 #include "i2c.h"
 
 const cmd_t *commands[] = {
     &help_command,
     &echo_command,
     &sleep_command,
+    &loop_command,
     &gpio_command,
+    &irq_command,
     &i2c_command,
     0,
 };
