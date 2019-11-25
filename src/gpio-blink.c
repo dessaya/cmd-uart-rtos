@@ -26,7 +26,8 @@ static void gpio_blink_task(void *param) {
 }
 
 void gpio_blink_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
-    cli_assert(args->count >= 4, gpio_usage);
+    cli_assert(args->count == 4, gpio_usage);
+
     int period = atoi(args->tokens[3]);
     cli_assert(period >= 0, gpio_usage);
 

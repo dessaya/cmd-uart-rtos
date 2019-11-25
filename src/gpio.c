@@ -14,6 +14,7 @@ void gpio_usage() {
         "  gpio TEC1 interrupt disable\r\n"
         "  gpio LEDB write 1\r\n"
         "  gpio LED1 blink 2000\r\n"
+        "  gpio LEDR toggle\r\n"
     );
 }
 
@@ -108,6 +109,8 @@ static bool parse_on_off_value(const char *name, bool_t *out) {
 
 /** `gpio <port> read` command handler function. */
 static void gpio_read_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
+    cli_assert(args->count == 3, gpio_usage);
+
     if (!gpio_take_mutex(port, 100)) {
         return;
     }
@@ -119,12 +122,23 @@ static void gpio_read_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
 
 /** `gpio <port> write` command handler function. */
 static void gpio_write_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
-    cli_assert(args->count >= 4, gpio_usage);
+    cli_assert(args->count == 4, gpio_usage);
+
     bool_t on_off;
     cli_assert(parse_on_off_value(args->tokens[3], &on_off), gpio_usage);
 
     if (gpio_take_mutex(port, 100)) {
         gpioWrite(port->pin, on_off);
+        gpio_release_mutex(port);
+    }
+}
+
+/** `gpio <port> toggle` command handler function. */
+static void gpio_toggle_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
+    cli_assert(args->count == 3, gpio_usage);
+
+    if (gpio_take_mutex(port, 100)) {
+        gpioToggle(port->pin);
         gpio_release_mutex(port);
     }
 }
@@ -149,6 +163,7 @@ typedef struct {
 static gpio_cmd_token_t gpio_cmd_handlers[] = {
     {(char *[]){"r", "read", 0}, gpio_read_cmd_handler},
     {(char *[]){"w", "write", 0}, gpio_write_cmd_handler},
+    {(char *[]){"t", "toggle", 0}, gpio_toggle_cmd_handler},
     {(char *[]){"b", "blink", 0}, gpio_blink_cmd_handler},
     {(char *[]){"i", "interrupt", 0}, gpio_interrupt_cmd_handler},
     {0},
