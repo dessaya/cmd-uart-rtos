@@ -27,6 +27,7 @@ static void enableGPIOIrq(uint8_t irqChannel, uint8_t port, uint8_t pin, edge_t 
    }
 
    NVIC_ClearPendingIRQ(PIN_INT0_IRQn + irqChannel);
+   NVIC_SetPriority(PIN_INT0_IRQn + irqChannel, configLIBRARY_LOWEST_INTERRUPT_PRIORITY);
    NVIC_EnableIRQ(PIN_INT0_IRQn + irqChannel);
 }
 
@@ -43,32 +44,19 @@ static bool parse_edge(const char *s, edge_t *out) {
     return false;
 }
 
-/** IRQ channel to use for the GPIO interrupt. */
-#define IRQ_CHANNEL 0
-
 /** `gpio interrupt` global state. */
 static struct {
     TaskHandle_t task_handle;
     cmd_args_t subcmd;
 } settings = {0};
 
-/**
- * FreeRTOS task that waits for the configured GPIO port to trigger the interrupt, and then
- * execute the configured subcommand.
- */
-static void gpio_subcommand_task(void *param) {
-    while (1) {
-        ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-        cli_exec_command(&settings.subcmd);
-    }
-}
-
-#define IRQ_HANDLER_NAME GPIO ## IRQ_CHANNEL ## _IRQHandler
+/** IRQ channel to use for the GPIO interrupt. */
+#define IRQ_CHANNEL 4
 
 /**
  * ISR triggered from the configured GPIO port, that notifies the GPIO subcommand task.
  */
-void IRQ_HANDLER_NAME()
+void GPIO4_IRQHandler()
 {
     BaseType_t context_switch_needed = pdFALSE;
 
@@ -81,6 +69,22 @@ void IRQ_HANDLER_NAME()
     Chip_PININT_ClearIntStatus(LPC_GPIO_PIN_INT, PININTCH(IRQ_CHANNEL));
 
     portYIELD_FROM_ISR(context_switch_needed);
+}
+
+/**
+ * FreeRTOS task that waits for the configured GPIO port to trigger the interrupt, and then
+ * execute the configured subcommand.
+ */
+static void gpio_subcommand_task(void *param) {
+    while (1) {
+        ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+
+        terminal_puts("GPIO triggered interrupt; executing `");
+        terminal_puts(settings.subcmd.tokens[0]);
+        terminal_println("` command.");
+
+        cli_exec_command(&settings.subcmd);
+    }
 }
 
 /** `gpio <port> interrupt` command handler function. */
@@ -113,7 +117,7 @@ void gpio_interrupt_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
             gpio_subcommand_task,
             "gpio interrupt wait task",
             configMINIMAL_STACK_SIZE * 2,
-            &settings.subcmd,
+            NULL,
             GPIO_SUBCOMMAND_TASK_PRIORITY,
             &settings.task_handle
         ) != pdPASS) {

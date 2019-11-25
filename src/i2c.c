@@ -4,6 +4,8 @@
 #include "i2c.h"
 #include "terminal.h"
 #include "sapi.h"
+#include "FreeRTOS.h"
+#include "semphr.h"
 
 /** Maximum size of receive data buffer (bytes) */
 #define RX_DATA_MAX 256
@@ -44,6 +46,25 @@ static void usage() {
  */
 static unsigned int i2c_freq_hz = 0;
 
+/** Mutex to synchronize concurrent access. */
+static SemaphoreHandle_t i2c_mutex;
+
+static bool i2c_take_mutex() {
+    if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(100)) == pdFALSE) {
+        log_error("Failed to take mutex");
+        return false;
+    }
+    return true;
+}
+
+static bool i2c_release_mutex() {
+    if (xSemaphoreGive(i2c_mutex) == pdFALSE) {
+        log_error("Failed to release mutex");
+        return false;
+    }
+    return true;
+}
+
 /**
  * `i2c init` command handler function.
  */
@@ -52,11 +73,23 @@ static void i2c_init(cmd_args_t *args) {
     int32_t freq = atoi(args->tokens[2]);
     cli_assert(freq >= 0 && freq <= 1000000, usage);
     i2c_freq_hz = freq;
-    if (i2c_freq_hz > 0) {
-        if (!i2cInit(I2C0, i2c_freq_hz)) {
-            log_error("Failed to initialize i2c interface");
+
+    if (i2c_mutex == NULL) {
+        i2c_mutex = xSemaphoreCreateMutex();
+        if (i2c_mutex == NULL) {
+            log_error("Failed to create mutex");
             return;
         }
+    }
+
+    if (i2c_freq_hz > 0) {
+        if (!i2c_take_mutex()) {
+            return;
+        }
+        if (!i2cInit(I2C0, i2c_freq_hz)) {
+            log_error("Failed to initialize i2c interface");
+        }
+        i2c_release_mutex();
     }
 }
 
@@ -206,7 +239,13 @@ static bool parse_write(const cmd_args_t *args, unsigned token_index, size_t *tx
 static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[], bool tx_stop, size_t rx_nbytes, bool rx_stop) {
     static uint8_t rx_data[RX_DATA_MAX];
 
-    if (!i2cRead(I2C0, device_address, tx_data, tx_nbytes, true, rx_data, rx_nbytes, true)) {
+    if (!i2c_take_mutex()) {
+        return;
+    }
+    bool_t success = i2cRead(I2C0, device_address, tx_data, tx_nbytes, true, rx_data, rx_nbytes, true);
+    i2c_release_mutex();
+
+    if (!success) {
         log_error("Failed to read from i2c device");
         return;
     }
@@ -216,9 +255,13 @@ static void i2c_write_read_print(uint8_t device_address, size_t tx_nbytes, uint8
 
 /** Transmit data to the I2C slave device. */
 static void i2c_write(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[], bool stop) {
+    if (!i2c_take_mutex()) {
+        return;
+    }
     if (!i2cWrite(I2C0, device_address, tx_data, tx_nbytes, stop)) {
         log_error("Failed to write to i2c device");
     }
+    i2c_release_mutex();
 }
 
 /** `i2c slave ...` command handler. */

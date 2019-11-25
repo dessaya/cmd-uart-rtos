@@ -57,6 +57,22 @@ static gpio_port_t *find_port(const char *name) {
     return NULL;
 }
 
+bool gpio_take_mutex(gpio_port_t *port, unsigned milliseconds) {
+    if (xSemaphoreTake(port->mutex, pdMS_TO_TICKS(milliseconds)) == pdFALSE) {
+        log_error("Failed to take mutex");
+        return false;
+    }
+    return true;
+}
+
+bool gpio_release_mutex(gpio_port_t *port) {
+    if (xSemaphoreGive(port->mutex) == pdFALSE) {
+        log_error("Failed to release mutex");
+        return false;
+    }
+    return true;
+}
+
 /**
  * Describes the different ways the user can turn a GPIO port on or off.
  *
@@ -92,7 +108,13 @@ static bool parse_on_off_value(const char *name, bool_t *out) {
 
 /** `gpio <port> read` command handler function. */
 static void gpio_read_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
-    terminal_println(on_off_to_string(gpioRead(port->pin)));
+    if (!gpio_take_mutex(port, 100)) {
+        return;
+    }
+    bool_t pin_value = gpioRead(port->pin);
+    gpio_release_mutex(port);
+
+    terminal_println(on_off_to_string(pin_value));
 }
 
 /** `gpio <port> write` command handler function. */
@@ -100,7 +122,11 @@ static void gpio_write_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
     cli_assert(args->count >= 4, gpio_usage);
     bool_t on_off;
     cli_assert(parse_on_off_value(args->tokens[3], &on_off), gpio_usage);
-    gpioWrite(port->pin, on_off);
+
+    if (gpio_take_mutex(port, 100)) {
+        gpioWrite(port->pin, on_off);
+        gpio_release_mutex(port);
+    }
 }
 
 /** `gpio <port> <subcommand>` handler function interface. */
@@ -156,6 +182,15 @@ static void gpio_cmd_handler(cmd_args_t *args) {
     cli_assert(port, gpio_usage);
     gpio_cmd_handler_t command = find_gpio_cmd(args->tokens[2]);
     cli_assert(command, gpio_usage);
+
+    if (port->mutex == NULL) {
+        port->mutex = xSemaphoreCreateMutex();
+        if (port->mutex == NULL) {
+            log_error("Failed to create mutex");
+            return;
+        }
+    }
+
     command(port, args);
 }
 

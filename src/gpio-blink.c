@@ -17,7 +17,10 @@ static void gpio_blink_task(void *param) {
     int period = ((blink_task_param_t *)param)->period;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     while (true) {
-        gpioToggle(port->pin);
+        if (gpio_take_mutex(port, period / 4)) {
+            gpioToggle(port->pin);
+            gpio_release_mutex(port);
+        }
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(period / 2));
     }
 }

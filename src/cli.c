@@ -28,7 +28,7 @@ static void parse_arguments(cmd_args_t *args) {
     args->count = 0;
     for (
         char *token = strtok(args->buf, " \t");
-        token && args->count < CLI_ARGC_MAX - 1;
+        token && args->count < CLI_ARGC_MAX;
         token = strtok(NULL, " \t")
     ) {
         args->tokens[args->count++] = token;

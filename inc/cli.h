@@ -7,7 +7,7 @@
 #define CLI_LINE_MAX 80
 
 /** Maximum amount of arguments for any given command. */
-#define CLI_ARGC_MAX 10
+#define CLI_ARGC_MAX 20
 
 /**
  * A parsed command, analogous to `argv` & `argc`.
