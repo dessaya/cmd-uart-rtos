@@ -15,28 +15,36 @@ La documentación se puede generar con el comando `doxygen Doxyfile`.
 
 Los módulos (pares de archivos `.c` y `.h`) principales son:
 
-* `terminal` controla la entrada/salida de texto mediante la UART.
-* `cli` controla la línea de comandos.
-* `commands` contiene la lista de comandos incluidos.
-* `echo` implementa el comando `echo`.
-* `sleep` implementa el comando `sleep`.
-* `gpio` implementa el comando `gpio`, que permite leer/escribir en puertos
+* `terminal.c` controla la entrada/salida de texto mediante la UART.
+* `cli.c` controla la línea de comandos.
+* `commands.c` contiene la lista de comandos incluidos.
+* `echo.c` implementa el comando `echo`.
+* `sleep.c` implementa el comando `sleep`.
+* `loop.c` implementa el comando `loop`, que permite lanzar una tarea que ejecuta
+  otro comando en un ciclo infinito.
+* `gpio.c` implementa el comando `gpio`, que permite leer/escribir en puertos
   GPIO.
-* `i2c` implementa el comando `i2c`, que permite interactuar con cualquier
+* `irq.c` implementa el comando `irq`, que permite ejecutar un comando
+  arbitrario cuando un GPIO lanza una interrupción.
+* `i2c.c` implementa el comando `i2c`, que permite interactuar con cualquier
   dispositivo en el bus I2C.
 
 ## RTOS
 
-Actualmente hay 3 tipos de tareas definidas, y sus prioridades están en el
+Hay 4 tipos de tareas definidas, y sus prioridades están en el
 archivo `task_priorities.h`. De mayor a menor prioridad:
 
-* `gpio_blink_task`: El comando `gpio blink` lanza una instancia de esta
-  tarea por cada puerto. Si el usuario modifica el periodo de blink de un
-  puerto particular, se elimina su tarea y se lanza una nueva.
 * `terminal_tx_task`: Se lanza al inicio. Controla la salida de la terminal,
   leyendo de una cola `txQueue`.
+* `loop_task`: Puede haber hasta 4 instancias. Se lanza una cada vez
+  que se ejecuta el comando `loop start`.
+* `irq_subcommand_task`: Puede haber hasta 4 instancias. Se lanza una con el
+  comando `irq`.
 * `cli_task`: Es la tarea principal, que muestra la línea de comandos y ejecuta
   los comandos recibidos.
 
-Además hay un ISR en el módulo `terminal` llamado `uart_rx_isr` que controla la
-entrada de la UART y envía los datos recibidos a la cola `rxQueue`.
+Además hay dos manejadores de interrupcion:
+
+* Un ISR en el módulo `terminal` llamado `uart_rx_isr` que controla la
+  entrada de la UART y envía los datos recibidos a la cola `rxQueue`.
+* Cuatro ISRs en el módulo `irq` (`GPIO<n>_IRQHandler`), que se ejecutan mediante los puertos GPIO.

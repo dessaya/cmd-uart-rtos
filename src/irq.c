@@ -55,14 +55,14 @@ static gpio_trigger_t *find_trigger(const char *name) {
 typedef enum { RAISING, FALLING } edge_t;
 
 /** Disable the GPIO IRQ. */
-static void disableGPIOIrq(uint8_t irq_channel)
+static void disable_irq(uint8_t irq_channel)
 {
     NVIC_ClearPendingIRQ(PIN_INT0_IRQn + irq_channel);
     NVIC_DisableIRQ(PIN_INT0_IRQn + irq_channel);
 }
 
 /** Enable the GPIO IRQ with the given trigger. */
-static void enableGPIOIrq(uint8_t irq_channel, gpio_trigger_t *trigger, edge_t edge)
+static void enable_irq(uint8_t irq_channel, gpio_trigger_t *trigger, edge_t edge)
 {
    Chip_SCU_GPIOIntPinSel(irq_channel, trigger->port, trigger->pin);
    Chip_PININT_ClearIntStatus(LPC_GPIO_PIN_INT, PININTCH(irq_channel));
@@ -174,7 +174,7 @@ static void irq_cmd_handler(cmd_args_t *args) {
 
     if (args->count == 3 && !strcmp(args->tokens[2], "disable")) {
         if (settings[irq_channel].task_handle != NULL) {
-            disableGPIOIrq(irq_channel);
+            disable_irq(irq_channel);
             vTaskDelete(settings[irq_channel].task_handle);
             settings[irq_channel].task_handle = NULL;
         }
@@ -207,7 +207,7 @@ static void irq_cmd_handler(cmd_args_t *args) {
             log_error("Failed to create task");
         }
 
-        enableGPIOIrq(irq_channel, trigger, edge);
+        enable_irq(irq_channel, trigger, edge);
         return;
     }
 
