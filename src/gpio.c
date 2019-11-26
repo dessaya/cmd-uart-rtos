@@ -65,8 +65,8 @@ static gpio_port_t *find_port(const char *name) {
 }
 
 /** Take the mutex for the given port. */
-static bool gpio_take_mutex(gpio_port_t *port, unsigned milliseconds) {
-    if (xSemaphoreTake(port->mutex, pdMS_TO_TICKS(milliseconds)) == pdFALSE) {
+static bool gpio_take_mutex(gpio_port_t *port) {
+    if (xSemaphoreTake(port->mutex, pdMS_TO_TICKS(100)) == pdFALSE) {
         log_error("Failed to take mutex");
         return false;
     }
@@ -119,7 +119,7 @@ static bool parse_on_off_value(const char *name, bool_t *out) {
 static void gpio_read_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
     cli_assert(args->count == 3, gpio_usage);
 
-    if (!gpio_take_mutex(port, 100)) {
+    if (!gpio_take_mutex(port)) {
         return;
     }
     bool_t pin_value = gpioRead(port->pin);
@@ -135,7 +135,7 @@ static void gpio_write_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
     bool_t on_off;
     cli_assert(parse_on_off_value(args->tokens[3], &on_off), gpio_usage);
 
-    if (gpio_take_mutex(port, 100)) {
+    if (gpio_take_mutex(port)) {
         gpioWrite(port->pin, on_off);
         gpio_release_mutex(port);
     }
@@ -145,7 +145,7 @@ static void gpio_write_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
 static void gpio_toggle_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
     cli_assert(args->count == 3, gpio_usage);
 
-    if (gpio_take_mutex(port, 100)) {
+    if (gpio_take_mutex(port)) {
         gpioToggle(port->pin);
         gpio_release_mutex(port);
     }
