@@ -19,7 +19,7 @@ static void print_help() {
 }
 
 /** Handler function for the `help` command. */
-static void help_cmd_handler(cmd_args_t *args) {
+static void help_cmd_handler(const cmd_args_t *args) {
     print_help();
 }
 
@@ -50,11 +50,11 @@ void cli_extract_subcommand(const cmd_args_t *cmd, unsigned subcmd_arg_index, cm
     memcpy(subcmd->buf, cmd->buf, CLI_LINE_MAX);
     subcmd->count = cmd->count - subcmd_arg_index;
     for (int i = 0; i < subcmd->count; i++) {
-        subcmd->tokens[i] = cmd->tokens[subcmd_arg_index + i];
+        subcmd->tokens[i] = subcmd->buf + (cmd->tokens[subcmd_arg_index + i] - cmd->buf);
     }
 }
 
-void cli_exec_command(cmd_args_t *args) {
+void cli_exec_command(const cmd_args_t *args) {
     const cmd_t *cmd = find_command(args->tokens[0]);
     if (!cmd) {
         terminal_puts("Unknown command: '");

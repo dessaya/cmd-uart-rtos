@@ -101,16 +101,18 @@ typedef struct {
     uint8_t irq_channel;
     /** RTOS task handle for irq_subcommand_task. */
     TaskHandle_t task_handle;
+    /** RTOS task name for irq_subcommand_task. */
+    TaskHandle_t task_name;
     /** Command to execute when IRQ is triggered. */
     cmd_args_t subcmd;
 } irq_settings_t;
 
 /** `irq` global state. */
 static irq_settings_t settings[IRQ_CHANNELS] = {
-    {.irq_channel = 0},
-    {.irq_channel = 1},
-    {.irq_channel = 2},
-    {.irq_channel = 3},
+    {.irq_channel = 0, .task_name = "irq0"},
+    {.irq_channel = 1, .task_name = "irq1"},
+    {.irq_channel = 2, .task_name = "irq2"},
+    {.irq_channel = 3, .task_name = "irq3"},
 };
 
 /** ISR triggered from the configured GPIO port, that notifies the corresponding RTOS task. */
@@ -166,7 +168,7 @@ static void irq_subcommand_task(void *param) {
 }
 
 /** `irq` command handler function. */
-static void irq_cmd_handler(cmd_args_t *args) {
+static void irq_cmd_handler(const cmd_args_t *args) {
     cli_assert(args->count >= 2, irq_usage);
 
     int irq_channel = atoi(args->tokens[1]);
@@ -198,7 +200,7 @@ static void irq_cmd_handler(cmd_args_t *args) {
 
         if (xTaskCreate(
             irq_subcommand_task,
-            "irq task",
+            settings[irq_channel].task_name,
             configMINIMAL_STACK_SIZE * 2,
             &settings[irq_channel],
             IRQ_TASK_PRIORITY,

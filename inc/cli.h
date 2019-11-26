@@ -26,7 +26,7 @@ typedef struct {
 } cmd_args_t;
 
 /** Command handler function prototype. */
-typedef void (*cmd_handler_t)(cmd_args_t *args);
+typedef void (*cmd_handler_t)(const cmd_args_t *args);
 
 /** Command definition. \see commands */
 typedef struct cmd {
@@ -48,7 +48,7 @@ extern const cmd_t help_command;
 void cli_extract_subcommand(const cmd_args_t *cmd, unsigned subcmd_arg_index, cmd_args_t *subcmd);
 
 /** Execute the command. */
-void cli_exec_command(cmd_args_t *args);
+void cli_exec_command(const cmd_args_t *args);
 
 /**
  * Utility macro: check a condition; if it's false, print an error message,

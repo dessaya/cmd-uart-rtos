@@ -68,7 +68,7 @@ static bool i2c_release_mutex() {
 /**
  * `i2c init` command handler function.
  */
-static void i2c_init(cmd_args_t *args) {
+static void i2c_init(const cmd_args_t *args) {
     cli_assert(args->count >= 3, usage);
     int32_t freq = atoi(args->tokens[2]);
     cli_assert(freq >= 0 && freq <= 1000000, usage);
@@ -265,7 +265,7 @@ static void i2c_write(uint8_t device_address, size_t tx_nbytes, uint8_t tx_data[
 }
 
 /** `i2c slave ...` command handler. */
-static void i2c_slave(cmd_args_t *args) {
+static void i2c_slave(const cmd_args_t *args) {
     if (!i2c_freq_hz) {
         log_error("`i2c init` must be called first.");
         return;
@@ -310,7 +310,7 @@ static void i2c_slave(cmd_args_t *args) {
 }
 
 /** `i2c` command handler. */
-static void i2c_cmd_handler(cmd_args_t *args) {
+static void i2c_cmd_handler(const cmd_args_t *args) {
     cli_assert(args->count >= 2, usage);
     if (!strcmp(args->tokens[1], "help")) {
         usage();

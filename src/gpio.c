@@ -116,7 +116,7 @@ static bool parse_on_off_value(const char *name, bool_t *out) {
 }
 
 /** `gpio <port> read` command handler function. */
-static void gpio_read_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
+static void gpio_read_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
     cli_assert(args->count == 3, gpio_usage);
 
     if (!gpio_take_mutex(port, 100)) {
@@ -129,7 +129,7 @@ static void gpio_read_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
 }
 
 /** `gpio <port> write` command handler function. */
-static void gpio_write_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
+static void gpio_write_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
     cli_assert(args->count == 4, gpio_usage);
 
     bool_t on_off;
@@ -142,7 +142,7 @@ static void gpio_write_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
 }
 
 /** `gpio <port> toggle` command handler function. */
-static void gpio_toggle_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
+static void gpio_toggle_cmd_handler(gpio_port_t *port, const cmd_args_t *args) {
     cli_assert(args->count == 3, gpio_usage);
 
     if (gpio_take_mutex(port, 100)) {
@@ -152,7 +152,7 @@ static void gpio_toggle_cmd_handler(gpio_port_t *port, cmd_args_t *args) {
 }
 
 /** `gpio <port> <subcommand>` handler function interface. */
-typedef void (*gpio_cmd_handler_t)(gpio_port_t *port, cmd_args_t *args);
+typedef void (*gpio_cmd_handler_t)(gpio_port_t *port, const cmd_args_t *args);
 
 /** `gpio <port> <subcommand>` definition. */
 typedef struct {
@@ -192,7 +192,7 @@ static gpio_cmd_handler_t find_gpio_cmd(const char *name) {
 }
 
 /** `gpio` command handler function. */
-static void gpio_cmd_handler(cmd_args_t *args) {
+static void gpio_cmd_handler(const cmd_args_t *args) {
     cli_assert(args->count >= 2, gpio_usage);
     if (!strcmp(args->tokens[1], "help")) {
         gpio_usage();

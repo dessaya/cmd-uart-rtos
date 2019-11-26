@@ -12,7 +12,7 @@ static void usage() {
 }
 
 /** `sleep` command handler function. */
-static void sleep_cmd_handler(cmd_args_t *args) {
+static void sleep_cmd_handler(const cmd_args_t *args) {
     cli_assert(args->count == 2, usage);
 
     int32_t ms = atoi(args->tokens[1]);
